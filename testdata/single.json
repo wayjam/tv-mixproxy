@@ -1,0 +1,81 @@
+{
+    "spider": "./example.txt;md5;1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p",
+    "wallpaper": "https://example-wallpaper.com/",
+    "sites": [
+      {
+        "key": "example1",
+        "name": "示例频道1",
+        "type": 3,
+        "api": "csp_Example1",
+        "searchable": 0,
+        "quickSearch": 0,
+        "filterable": 0
+      },
+      {
+        "key": "example2",
+        "name": "示例频道2",
+        "type": 3,
+        "api": "csp_Example2",
+        "searchable": 1,
+        "quickSearch": 1,
+        "changeable": 0,
+        "ext": {
+          "aliToken": "example/token.txt",
+          "quarkCookie": "example/cookie.txt",
+          "from": "hd|sd|ld",
+          "siteUrl": "https://www.example.com/",
+          "danMu": "示例"
+        }
+      },
+      {
+        "key": "example3",
+        "name": "示例频道3",
+        "type": 3,
+        "api": "csp_Example3",
+        "searchable": 0,
+        "quickSearch": 0,
+        "changeable": 0
+      }
+    ],
+    "doh": [
+      {
+        "name": "ExampleDNS1",
+        "url": "https://dns.example1.com/dns-query",
+        "ips": [
+          "1.1.1.1",
+          "2.2.2.2"
+        ]
+      },
+      {
+        "name": "ExampleDNS2",
+        "url": "https://dns.example2.com/dns-query",
+        "ips": [
+          "3.3.3.3",
+          "4.4.4.4",
+          "2001:db8::1",
+          "2001:db8::2"
+        ]
+      }
+    ],
+    "logo": "https://example.com/logo.gif",
+    "lives": [
+      {
+        "name": "example_live1",
+        "type": 0,
+        "url": "./lib/example_live1.txt",
+        "playerType": 1
+      },
+      {
+        "name": "example_live2",
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "type": 0,
+        "url": "https://example.com/live2.m3u"
+      },
+      {
+        "name": "example_live3",
+        "type": 0,
+        "url": "./lib/example_live3.m3u",
+        "playerType": 1
+      }
+    ]
+  }

@@ -1,0 +1,21 @@
+// 所有内容仅供学习使用，请勿用于违法用途
+{
+	"urls": [
+		{
+			"url": "https://example.com/api1.json",
+			"name": "示例源1"
+		},
+		{
+			"url": "https://example.com/api2.json",
+			"name": "示例源2"
+		},
+		{
+			"url": "https://example.com/api3.txt",
+			"name": "示例源3"
+		},
+		{
+			"url": "https://example.com/api4",
+			"name": "示例源4"
+		}
+	]
+}
