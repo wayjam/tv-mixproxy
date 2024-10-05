@@ -10,13 +10,20 @@ import (
 )
 
 type Sourcer interface {
-	GetSource(name string) ([]byte, error)
+	GetSource(name string) (*Source, error)
 }
 
-var (
-	_ Sourcer = &SourceManager{}
-	_ Sourcer = &Source{}
-)
+// type SingleSourcer interface {
+// 	Sourcer
+// 	Type() config.SourceType
+// 	URL() string
+// 	Name() string
+// }
+
+// var (
+// 	_ Sourcer = &SourceManager{}
+// 	_ Sourcer = &Source{}
+// )
 
 type SourceManager struct {
 	sources map[string]*Source
@@ -33,8 +40,16 @@ type Source struct {
 	errorCount int
 }
 
+func (s *Source) Data() []byte {
+	return s.data
+}
+
 func (s *Source) Type() config.SourceType {
 	return s.config.Type
+}
+
+func (s *Source) URL() string {
+	return s.config.URL
 }
 
 func (s *Source) Name() string {
@@ -86,7 +101,7 @@ func (sm *SourceManager) refreshExpiredSources() {
 	}
 }
 
-func (sm *SourceManager) GetSource(name string) ([]byte, error) {
+func (sm *SourceManager) GetSource(name string) (*Source, error) {
 	sm.mu.RLock()
 	source, ok := sm.sources[name]
 	sm.mu.RUnlock()
@@ -101,7 +116,7 @@ func (sm *SourceManager) GetSource(name string) ([]byte, error) {
 		}
 	}
 
-	return source.data, nil
+	return source, nil
 }
 
 func (sm *SourceManager) refreshSource(name string) error {

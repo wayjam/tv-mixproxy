@@ -109,6 +109,17 @@ var (
 				"playerType": 2
 			}
 		],
+		"lives": [
+			{
+				"name": "Live Channel",
+				"type": 0,
+				"url": "https://example.com/live.m3u",
+				"playerType": 1,
+				"ua": "Mozilla/5.0",
+				"epg": "https://example.com/epg",
+				"logo": "https://example.com/logo.png"
+			}
+		],
 		"doh": [
 			{
 				"name": "Google",
@@ -116,16 +127,22 @@ var (
 				"ips": ["8.8.8.8", "8.8.4.4"]
 			}
 		],
-		"logo": "https://example.com/logo.png",
-		"lives": [
+		"parses": [
 			{
-				"name": "Live Channel",
+				"name": "Parser 1",
 				"type": 0,
-				"url": "https://example.com/live.m3u",
-				"playerType": 1,
-				"ua": "Mozilla/5.0"
+				"url": "https://example.com/parser1"
 			}
-		]
+		],
+		"flags": ["flag1", "flag2"],
+		"rules": [
+			{
+				"name": "Rule 1",
+				"hosts": ["example.com"],
+				"regex": ["pattern1", "pattern2"]
+			}
+		],
+		"ads": ["ad1", "ad2"]
 	}`
 )
 
@@ -147,12 +164,19 @@ func TestLoadTvBoxConfig(t *testing.T) {
 		assert.Equal(t, "https://example.com/wallpaper.jpg", config.Wallpaper)
 		assert.Len(t, config.Sites, 2)
 		assert.Equal(t, "site1", config.Sites[0].Key)
-		assert.Equal(t, 2, config.Sites[1].PlayerType)
+		assert.Equal(t, FlexInt(2), config.Sites[1].PlayerType)
 		assert.Len(t, config.DOH, 1)
 		assert.Equal(t, "Google", config.DOH[0].Name)
-		assert.Equal(t, "https://example.com/logo.png", config.Logo)
 		assert.Len(t, config.Lives, 1)
 		assert.Equal(t, "Live Channel", config.Lives[0].Name)
+		assert.Equal(t, "https://example.com/epg", config.Lives[0].EPG)
+		assert.Equal(t, "https://example.com/logo.png", config.Lives[0].Logo)
+		assert.Len(t, config.Parses, 1)
+		assert.Equal(t, "Parser 1", config.Parses[0].Name)
+		assert.Equal(t, []string{"flag1", "flag2"}, config.Flags)
+		assert.Len(t, config.Rules, 1)
+		assert.Equal(t, "Rule 1", config.Rules[0].Name)
+		assert.Equal(t, []string{"ad1", "ad2"}, config.Ads)
 	})
 
 	t.Run("Load from network URL", func(t *testing.T) {

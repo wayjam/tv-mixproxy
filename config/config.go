@@ -15,6 +15,24 @@ type Config struct {
 	MultiRepoOpt  MultiRepoOpt  `mapstructure:"multi_repo_opt"`  // 多仓源配置
 }
 
+func (c *Config) Fixture() {
+	c.SingleRepoOpt.Spider.Field = "spider"
+	c.SingleRepoOpt.Wallpaper.Field = "wallpaper"
+	c.SingleRepoOpt.Logo.Field = "logo"
+	c.SingleRepoOpt.Sites.Field = "sites"
+	c.SingleRepoOpt.DOH.Field = "doh"
+	c.SingleRepoOpt.Lives.Field = "lives"
+	c.SingleRepoOpt.Parses.Field = "parses"
+	c.SingleRepoOpt.Flags.Field = "flags"
+	c.SingleRepoOpt.Rules.Field = "rules"
+	c.SingleRepoOpt.Ads.Field = "ads"
+
+	for i := range c.MultiRepoOpt.Repos {
+		c.MultiRepoOpt.Repos[i].Field = "urls"
+		c.MultiRepoOpt.Repos[i].FilterBy = "name"
+	}
+}
+
 type LogOpt struct {
 	Output string `mapstructure:"output"` // 日志输出路径, stdout 表示输出到标准输出
 	Level  int    `mapstructure:"level"`  // 日志级别, 0: Trace, 1: Debug, 2: Info, 3: Warn, 4: Error, 5: Fatal, 6: Panic
@@ -28,6 +46,10 @@ type SingleRepoOpt struct {
 	Sites     ArrayMixOpt `mapstructure:"sites"`
 	DOH       ArrayMixOpt `mapstructure:"doh"`
 	Lives     ArrayMixOpt `mapstructure:"lives"`
+	Parses    ArrayMixOpt `mapstructure:"parses"`
+	Flags     ArrayMixOpt `mapstructure:"flags"`
+	Rules     ArrayMixOpt `mapstructure:"rules"`
+	Ads       ArrayMixOpt `mapstructure:"ads"`
 }
 
 type MultiRepoOpt struct {
@@ -91,21 +113,7 @@ func LoadServerConfig(cfgFile string) (*Config, error) {
 		return nil, fmt.Errorf("unable to decode into struct: %v", err)
 	}
 
-	configFixture(&cfg)
+	cfg.Fixture()
 
 	return &cfg, nil
-}
-
-func configFixture(c *Config) {
-	c.SingleRepoOpt.Spider.Field = "spider"
-	c.SingleRepoOpt.Wallpaper.Field = "wallpaper"
-	c.SingleRepoOpt.Logo.Field = "logo"
-	c.SingleRepoOpt.Sites.Field = "sites"
-	c.SingleRepoOpt.DOH.Field = "doh"
-	c.SingleRepoOpt.Lives.Field = "lives"
-
-	for i := range c.MultiRepoOpt.Repos {
-		c.MultiRepoOpt.Repos[i].Field = "urls"
-		c.MultiRepoOpt.Repos[i].FilterBy = "name"
-	}
 }

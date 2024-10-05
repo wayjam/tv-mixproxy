@@ -69,6 +69,7 @@ func (s *server) SetupRoutes(app *fiber.App) {
 	v1 := app.Group("/v1")
 	v1.Get("/repo", NewRepoHandler(s.cfg, s.sourceManager))
 	v1.Get("/multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager))
+	v1.Get("/spider", NewSpiderHandler(s.cfg, s.sourceManager))
 }
 
 func (s *server) Run() error {

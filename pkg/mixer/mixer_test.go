@@ -1,6 +1,7 @@
 package mixer
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,18 +11,26 @@ import (
 
 // MockSourcer 是一个模拟的 Sourcer 实现
 type MockSourcer struct {
-	sources map[string][]byte
+	sources map[string]*Source
 }
 
-func (m *MockSourcer) GetSource(name string) ([]byte, error) {
-	return m.sources[name], nil
+func (m *MockSourcer) GetSource(name string) (*Source, error) {
+	source, ok := m.sources[name]
+	if !ok {
+		return nil, fmt.Errorf("source not found: %s", name)
+	}
+	return source, nil
 }
 
 func TestMixRepo(t *testing.T) {
 	mockSourcer := &MockSourcer{
-		sources: map[string][]byte{
-			"source1": []byte(`{"spider":"spider1","wallpaper":"wall1","logo":"logo1","sites":[{"key":"site1","name":"Site 1"}],"doh":[{"name":"doh1"}],"lives":[{"name":"live1"}]}`),
-			"source2": []byte(`{"spider":"spider2","wallpaper":"wall2","logo":"logo2","sites":[{"key":"site2","name":"Site 2"}],"doh":[{"name":"doh2"}],"lives":[{"name":"live2"}]}`),
+		sources: map[string]*Source{
+			"source1": {
+				data: []byte(`{"spider":"spider1","wallpaper":"wall1","logo":"logo1","sites":[{"key":"site1","name":"Site 1"}],"doh":[{"name":"doh1"}],"lives":[{"name":"live1"}]}`),
+			},
+			"source2": {
+				data: []byte(`{"spider":"spider2","wallpaper":"wall2","logo":"logo2","sites":[{"key":"site2","name":"Site 2"}],"doh":[{"name":"doh2"}],"lives":[{"name":"live2"}]}`),
+			},
 		},
 	}
 
@@ -50,8 +59,10 @@ func TestMixRepo(t *testing.T) {
 
 func TestMixField(t *testing.T) {
 	mockSourcer := &MockSourcer{
-		sources: map[string][]byte{
-			"source1": []byte(`{"field1":"value1","field2":"value2"}`),
+		sources: map[string]*Source{
+			"source1": {
+				data: []byte(`{"field1":"value1","field2":"value2"}`),
+			},
 		},
 	}
 
@@ -65,8 +76,10 @@ func TestMixField(t *testing.T) {
 
 func TestMixArrayField(t *testing.T) {
 	mockSourcer := &MockSourcer{
-		sources: map[string][]byte{
-			"source1": []byte(`{"array":[{"key":"item1","value":"value1"},{"key":"item2","value":"value2"}]}`),
+		sources: map[string]*Source{
+			"source1": {
+				data: []byte(`{"array":[{"key":"item1","value":"value1"},{"key":"item2","value":"value2"}]}`),
+			},
 		},
 	}
 
@@ -115,13 +128,17 @@ func TestFilterArray(t *testing.T) {
 
 func TestMixMultiRepo(t *testing.T) {
 	mockSourcer := &MockSourcer{
-		sources: map[string][]byte{
-			"multi_source": []byte(`{"urls":[
-				{"url":"http://example1.com","name":"Repo 1"},
-				{"url":"http://example2.com","name":"Repo 2"},
-				{"url":"http://example3.com","name":"Repo 3"}
-			]}`),
-			"single_source": []byte(`{"spider":"spider1","wallpaper":"wall1","logo":"logo1","sites":[{"key":"site1","name":"Site 1"}],"doh":[{"name":"doh1"}],"lives":[{"name":"live1"}]}`),
+		sources: map[string]*Source{
+			"multi_source": {
+				data: []byte(`{"urls":[
+					{"url":"http://example1.com","name":"Repo 1"},
+					{"url":"http://example2.com","name":"Repo 2"},
+					{"url":"http://example3.com","name":"Repo 3"}
+				]}`),
+			},
+			"single_source": {
+				data: []byte(`{"spider":"spider1","wallpaper":"wall1","logo":"logo1","sites":[{"key":"site1","name":"Site 1"}],"doh":[{"name":"doh1"}],"lives":[{"name":"live1"}]}`),
+			},
 		},
 	}
 
@@ -142,15 +159,18 @@ func TestMixMultiRepo(t *testing.T) {
 		},
 	}
 
+	cfg.Fixture()
+
 	result, err := MixMultiRepo(cfg, mockSourcer)
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
+
 	assert.Len(t, result.Repos, 4) // 3 from multi_source + 1 single repo
-	assert.Equal(t, "Repo 1", result.Repos[0].Name)
-	assert.Equal(t, "Repo 2", result.Repos[1].Name)
-	assert.Equal(t, "Repo 3", result.Repos[2].Name)
-	assert.Equal(t, "TvBox MixProxy", result.Repos[3].Name)
-	assert.Contains(t, result.Repos[3].URL, "/repo")
+	assert.Equal(t, "TvBox MixProxy", result.Repos[0].Name)
+	assert.Contains(t, result.Repos[0].URL, "/repo")
+	assert.Equal(t, "Repo 1", result.Repos[1].Name)
+	assert.Equal(t, "Repo 2", result.Repos[2].Name)
+	assert.Equal(t, "Repo 3", result.Repos[3].Name)
 
 	// Test case 2: With filtering
 	cfg.MultiRepoOpt.Repos[0].Include = "Repo [12]"
@@ -160,7 +180,7 @@ func TestMixMultiRepo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, filteredResult)
 	assert.Len(t, filteredResult.Repos, 2) // 1 filtered from multi_source + 1 single repo
-	assert.Equal(t, "Repo 1", filteredResult.Repos[0].Name)
-	assert.Equal(t, "TvBox MixProxy", filteredResult.Repos[1].Name)
-	assert.Contains(t, filteredResult.Repos[1].URL, "/repo")
+	assert.Equal(t, "TvBox MixProxy", filteredResult.Repos[0].Name)
+	assert.Contains(t, filteredResult.Repos[0].URL, "/repo")
+	assert.Equal(t, "Repo 1", filteredResult.Repos[1].Name)
 }

@@ -4,28 +4,78 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/proxy"
 	"github.com/tidwall/gjson"
 
 	"github.com/wayjam/tvbox-mixproxy/config"
 )
 
+var (
+	nullHandler fiber.Handler = func(c fiber.Ctx) error {
+		return nil
+	}
+)
+
+func NewMixURLHandler(
+	mixOpt config.MixOpt, sourcer Sourcer,
+) (fiber.Handler, error) {
+	if mixOpt.SourceName == "" {
+		return nullHandler, nil
+	}
+
+	// 如果 source_name 以 file:// 开头，则返回一个 fiber 处理器，该处理器从文件系统中读取文件内容
+	if strings.HasPrefix(mixOpt.SourceName, "file://") {
+		// Extract file path from the source name
+		filePath := strings.TrimPrefix(mixOpt.SourceName, "file://")
+
+		// Return a fiber handler that serves the file content
+		return func(c fiber.Ctx) error {
+			return c.SendFile(filePath)
+		}, nil
+	}
+
+	url, source, err := mixFieldAndGetSource(mixOpt, sourcer)
+	if err != nil {
+		return nullHandler, fmt.Errorf("mixing url: %w", err)
+	}
+
+	if source.Type() != config.SourceTypeSingle {
+		return nullHandler, fmt.Errorf("source %s should be a single source", mixOpt.SourceName)
+	}
+
+	if url == "" {
+		return nullHandler, nil
+	}
+
+	// 移除 URL 中可能存在的校验信息
+	url = strings.Split(url, ";")[0]
+	// 如果是相对路径，则返回一个 proxy 处理器，该处理器将请求转发到相对路径
+	url = fullFillURL(url, source)
+
+	return proxy.Forward(url), nil
+}
+
 // MixRepo 函数根据配置混合多个单仓源
 func MixRepo(
 	cfg *config.Config, sourcer Sourcer,
-) (*config.TVBoxConfig, error) {
-	result := &config.TVBoxConfig{
+) (*config.RepoConfig, error) {
+	result := &config.RepoConfig{
 		Wallpaper: getExternalURL(cfg) + "/wallpaper?bg_color=333333&border_width=5&border_color=666666",
 		Logo:      getExternalURL(cfg) + "/logo",
+		Spider:    getExternalURL(cfg) + "/v1/spider",
 	}
 	singleRepoOpt := cfg.SingleRepoOpt
 
 	// 混合 spider 字段
 	if singleRepoOpt.Spider.SourceName != "" {
-		spider, err := mixField(singleRepoOpt.Spider, sourcer)
+		spider, source, err := mixFieldAndGetSource(singleRepoOpt.Spider, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing spider: %w", err)
 		}
+		spider = fullFillURL(spider, source)
 		result.Spider = spider
 	}
 
@@ -49,11 +99,15 @@ func MixRepo(
 
 	// 混合 sites 数组
 	if singleRepoOpt.Sites.SourceName != "" {
-		sites, err := mixArrayField[config.Site](singleRepoOpt.Sites, sourcer)
+		sites, source, err := mixArrayFieldAndGetSource[config.Site](singleRepoOpt.Sites, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing sites: %w", err)
 		}
-		result.Sites = sites
+		// 处理 Site 结构体的特殊字段
+		for i := range sites {
+			site := processSiteFields(sites[i], source)
+			result.Sites = append(result.Sites, site)
+		}
 	}
 
 	// 混合 doh 数组
@@ -67,11 +121,51 @@ func MixRepo(
 
 	// 混合 lives 数组
 	if singleRepoOpt.Lives.SourceName != "" {
-		lives, err := mixArrayField[config.Live](singleRepoOpt.Lives, sourcer)
+		lives, source, err := mixArrayFieldAndGetSource[config.Live](singleRepoOpt.Lives, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing lives: %w", err)
 		}
-		result.Lives = lives
+		// 处理 Site 结构体的特殊字段
+		for i := range lives {
+			live := processLiveFields(lives[i], source)
+			result.Lives = append(result.Lives, live)
+		}
+	}
+
+	// 混合 parses 数组
+	if singleRepoOpt.Parses.SourceName != "" {
+		parses, err := mixArrayField[config.Parse](singleRepoOpt.Parses, sourcer)
+		if err != nil {
+			return result, fmt.Errorf("mixing parses: %w", err)
+		}
+		result.Parses = parses
+	}
+
+	// 混合 flags 数组
+	if singleRepoOpt.Flags.SourceName != "" {
+		flags, err := mixArrayField[string](singleRepoOpt.Flags, sourcer)
+		if err != nil {
+			return result, fmt.Errorf("mixing flags: %w", err)
+		}
+		result.Flags = flags
+	}
+
+	// 混合 rules 数组
+	if singleRepoOpt.Rules.SourceName != "" {
+		rules, err := mixArrayField[config.Rule](singleRepoOpt.Rules, sourcer)
+		if err != nil {
+			return result, fmt.Errorf("mixing rules: %w", err)
+		}
+		result.Rules = rules
+	}
+
+	// 混合 ads 数组
+	if singleRepoOpt.Ads.SourceName != "" {
+		ads, err := mixArrayField[string](singleRepoOpt.Ads, sourcer)
+		if err != nil {
+			return result, fmt.Errorf("mixing ads: %w", err)
+		}
+		result.Ads = ads
 	}
 
 	return result, nil
@@ -79,34 +173,53 @@ func MixRepo(
 
 // mixField 混合单个字段
 func mixField(opt config.MixOpt, sourcer Sourcer) (string, error) {
+	value, _, err := mixFieldAndGetSource(opt, sourcer)
+	if err != nil {
+		return "", err
+	}
+
+	return value, nil
+}
+
+// mixFieldAndGetSource 混合单个字段并返回源
+func mixFieldAndGetSource(opt config.MixOpt, sourcer Sourcer) (string, *Source, error) {
 	source, err := sourcer.GetSource(opt.SourceName)
 	if err != nil {
-		return "", fmt.Errorf("getting source %s: %w", opt.SourceName, err)
+		return "", nil, fmt.Errorf("getting source %s: %w", opt.SourceName, err)
 	}
 
-	value := gjson.GetBytes(source, opt.Field)
+	value := gjson.GetBytes(source.Data(), opt.Field)
 	if !value.Exists() {
-		return "", fmt.Errorf("field %s not found in source %s", opt.Field, opt.SourceName)
+		return "", source, fmt.Errorf("field %s not found in source %s", opt.Field, opt.SourceName)
 	}
 
-	return value.String(), nil
+	return value.String(), source, nil
 }
 
 // mixArrayField 混合数组字段
 func mixArrayField[T any](opt config.ArrayMixOpt, sourcer Sourcer) ([]T, error) {
-	source, err := sourcer.GetSource(opt.SourceName)
+	array, _, err := mixArrayFieldAndGetSource[T](opt, sourcer)
 	if err != nil {
-		return nil, fmt.Errorf("getting source %s: %w", opt.SourceName, err)
+		return nil, err
 	}
 
-	array := gjson.GetBytes(source, opt.Field)
+	return array, nil
+}
+
+func mixArrayFieldAndGetSource[T any](opt config.ArrayMixOpt, sourcer Sourcer) ([]T, *Source, error) {
+	source, err := sourcer.GetSource(opt.SourceName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting source %s: %w", opt.SourceName, err)
+	}
+
+	array := gjson.GetBytes(source.Data(), opt.Field)
 	if !array.Exists() || !array.IsArray() {
-		return nil, fmt.Errorf("field %s not found or not an array in source %s", opt.Field, opt.SourceName)
+		return nil, source, fmt.Errorf("field %s not found or not an array in source %s", opt.Field, opt.SourceName)
 	}
 
 	filteredArray, err := filterArray(array.Array(), opt)
 	if err != nil {
-		return nil, fmt.Errorf("filtering array: %w", err)
+		return nil, source, fmt.Errorf("filtering array: %w", err)
 	}
 
 	var result []T
@@ -114,12 +227,12 @@ func mixArrayField[T any](opt config.ArrayMixOpt, sourcer Sourcer) ([]T, error) 
 		var t T
 		err := json.Unmarshal([]byte(item.Raw), &t)
 		if err != nil {
-			return nil, fmt.Errorf("unmarshal error: %w", err)
+			return nil, source, fmt.Errorf("unmarshal error: %w", err)
 		}
 		result = append(result, t)
 	}
 
-	return result, nil
+	return result, source, nil
 }
 
 // filterArray 根据配置过滤数组
@@ -156,6 +269,7 @@ func filterArray(array []gjson.Result, opt config.ArrayMixOpt) ([]gjson.Result, 
 			result = append(result, item)
 		}
 	}
+
 	return result, nil
 }
 
@@ -195,4 +309,45 @@ func getExternalURL(cfg *config.Config) (url string) {
 		url = cfg.ExternalURL
 	}
 	return
+}
+
+// fullFillURL 将相对路径转换为绝对路径
+func fullFillURL(url string, source *Source) string {
+	if strings.HasPrefix(url, "./") {
+		baseURL := source.URL()
+		lastSlashIndex := strings.LastIndex(baseURL, "/")
+		if lastSlashIndex != -1 {
+			baseURL = baseURL[:lastSlashIndex+1]
+		}
+		url = baseURL + strings.TrimPrefix(url, "./")
+	}
+
+	return url
+}
+
+func processSiteFields(item config.Site, source *Source) config.Site {
+	if strings.HasPrefix(item.API, "./") {
+		item.API = fullFillURL(item.API, source)
+	}
+
+	if strings.HasPrefix(item.Jar, "./") {
+		item.Jar = fullFillURL(item.Jar, source)
+	}
+
+	switch ext := item.Ext.(type) {
+	case string:
+		if strings.HasPrefix(ext, "./") {
+			item.Ext = fullFillURL(ext, source)
+		}
+	}
+
+	return item
+}
+
+func processLiveFields(item config.Live, source *Source) config.Live {
+	if strings.HasPrefix(item.URL, "./") {
+		item.URL = fullFillURL(item.URL, source)
+	}
+
+	return item
 }

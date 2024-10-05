@@ -86,3 +86,14 @@ func NewMultiRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager)
 		return c.JSON(result)
 	}
 }
+
+func NewSpiderHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
+	handler, err := mixer.NewMixURLHandler(cfg.SingleRepoOpt.Spider, sourceManager)
+	if err != nil {
+		return func(c fiber.Ctx) error {
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		}
+	}
+
+	return handler
+}

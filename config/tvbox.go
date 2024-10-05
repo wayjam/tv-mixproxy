@@ -45,13 +45,17 @@ type RepoURLConfig struct {
 	Name string `json:"name"`
 }
 
-type TVBoxConfig struct {
-	Spider    string `json:"spider"`
-	Wallpaper string `json:"wallpaper"`
-	Logo      string `json:"logo"`
-	Sites     []Site `json:"sites"`
-	DOH       []DOH  `json:"doh"`
-	Lives     []Live `json:"lives"`
+type RepoConfig struct {
+	Spider    string   `json:"spider"`
+	Lives     []Live   `json:"lives"`
+	Wallpaper string   `json:"wallpaper"`
+	Sites     []Site   `json:"sites"`
+	Parses    []Parse  `json:"parses"`
+	Flags     []string `json:"flags"`
+	DOH       []DOH    `json:"doh"`
+	Rules     []Rule   `json:"rules"`
+	Ads       []string `json:"ads"`
+	Logo      string   `json:"logo,omitempty"` // 保留原有字段
 }
 
 type Site struct {
@@ -62,11 +66,11 @@ type Site struct {
 	Searchable  FlexInt `json:"searchable"`
 	QuickSearch FlexInt `json:"quickSearch"`
 	Filterable  FlexInt `json:"filterable"`
-	Changeable  FlexInt `json:"changeable,omitempty"`
-	PlayerType  FlexInt `json:"playerType,omitempty"`
 	Ext         any     `json:"ext,omitempty"`
+	Jar         string  `json:"jar,omitempty"`
+	PlayerType  FlexInt `json:"playerType,omitempty"`
+	Changeable  FlexInt `json:"changeable,omitempty"`
 	Timeout     FlexInt `json:"timeout,omitempty"`
-	Style       *Style  `json:"style,omitempty"`
 }
 
 type Style struct {
@@ -84,8 +88,25 @@ type Live struct {
 	Name       string  `json:"name"`
 	Type       FlexInt `json:"type"`
 	URL        string  `json:"url"`
-	PlayerType FlexInt `json:"playerType,omitempty"`
+	PlayerType FlexInt `json:"playerType"`
 	UA         string  `json:"ua,omitempty"`
+	EPG        string  `json:"epg,omitempty"`
+	Logo       string  `json:"logo,omitempty"`
+	Timeout    FlexInt `json:"timeout,omitempty"`
+}
+
+type Parse struct {
+	Name string  `json:"name"`
+	Type FlexInt `json:"type"`
+	URL  string  `json:"url"`
+	Ext  any     `json:"ext,omitempty"`
+}
+
+type Rule struct {
+	Name   string   `json:"name"`
+	Hosts  []string `json:"hosts"`
+	Regex  []string `json:"regex,omitempty"`
+	Script []string `json:"script,omitempty"`
 }
 
 func LoadData(uri string) ([]byte, error) {
@@ -130,8 +151,8 @@ func ParseMultiRepoConfig(data []byte) (*MultiRepoConfig, error) {
 	return &config, nil
 }
 
-func ParseTvBoxConfig(data []byte) (*TVBoxConfig, error) {
-	var config TVBoxConfig
+func ParseTvBoxConfig(data []byte) (*RepoConfig, error) {
+	var config RepoConfig
 	err := json.Unmarshal(data, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %v", err)
@@ -147,7 +168,7 @@ func LoadMultiRepoConfig(uri string) (*MultiRepoConfig, error) {
 	return ParseMultiRepoConfig(data)
 }
 
-func LoadTvBoxConfig(uri string) (*TVBoxConfig, error) {
+func LoadTvBoxConfig(uri string) (*RepoConfig, error) {
 	data, err := LoadData(uri)
 	if err != nil {
 		return nil, err

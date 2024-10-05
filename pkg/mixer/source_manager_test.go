@@ -28,7 +28,7 @@ func TestNewSourceManager(t *testing.T) {
 func TestGetSource(t *testing.T) {
 	// Setup a test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		config := config.TVBoxConfig{
+		config := config.RepoConfig{
 			Spider: "test_spider",
 			Sites:  []config.Site{{Key: "test_site", Name: "Test Site"}},
 		}
@@ -47,8 +47,8 @@ func TestGetSource(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, data)
 
-	var config config.TVBoxConfig
-	err = json.Unmarshal(data, &config)
+	var config config.RepoConfig
+	err = json.Unmarshal(data.data, &config)
 	assert.NoError(t, err)
 	assert.Equal(t, "test_spider", config.Spider)
 	assert.Len(t, config.Sites, 1)
@@ -68,7 +68,7 @@ func TestRefreshSource(t *testing.T) {
 	callCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
-		config := config.TVBoxConfig{
+		config := config.RepoConfig{
 			Spider: "test_spider",
 			Sites:  []config.Site{{Key: "test_site", Name: "Test Site"}},
 		}
