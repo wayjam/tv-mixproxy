@@ -69,10 +69,10 @@ func LoadServerConfig(cfgFile string) (*Config, error) {
 		// Use config file from the flag
 		v.SetConfigFile(cfgFile)
 	} else {
-		// Search for config in home directory with name ".tvbox" (without extension)
+		// Search for config in the current directory with name "tvbox_mixproxy.yaml"
 		v.AddConfigPath(".")
-		v.AddConfigPath("$HOME")
-		v.SetConfigName(".tvbox_mixproxy")
+		v.SetConfigName("tvbox_mixproxy")
+		v.SetConfigType("yaml")
 	}
 
 	v.SetEnvPrefix("TVBOX_MIXPROXY")

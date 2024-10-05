@@ -7,8 +7,34 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
+
+// FlexInt 是一个灵活的整数类型，可以从 JSON 中的数字或字符串解析
+type FlexInt int
+
+// UnmarshalJSON 实现了 json.Unmarshaler 接口
+func (fi *FlexInt) UnmarshalJSON(data []byte) error {
+	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
+		// 如果是字符串，去掉引号
+		data = data[1 : len(data)-1]
+	}
+
+	// 尝试将数据解析为整数
+	i, err := strconv.Atoi(string(data))
+	if err != nil {
+		return fmt.Errorf("FlexInt: %w", err)
+	}
+
+	*fi = FlexInt(i)
+	return nil
+}
+
+// MarshalJSON 实现了 json.Marshaler 接口
+func (fi FlexInt) MarshalJSON() ([]byte, error) {
+	return json.Marshal(int(fi))
+}
 
 type MultiRepoConfig struct {
 	Repos []RepoURLConfig `json:"urls"`
@@ -29,18 +55,18 @@ type TVBoxConfig struct {
 }
 
 type Site struct {
-	Key         string `json:"key"`
-	Name        string `json:"name"`
-	Type        int    `json:"type"`
-	API         string `json:"api"`
-	Searchable  int    `json:"searchable"`
-	QuickSearch int    `json:"quickSearch"`
-	Filterable  int    `json:"filterable"`
-	Changeable  int    `json:"changeable,omitempty"`
-	PlayerType  int    `json:"playerType,omitempty"`
-	Ext         any    `json:"ext,omitempty"`
-	Timeout     int    `json:"timeout,omitempty"`
-	Style       *Style `json:"style,omitempty"`
+	Key         string  `json:"key"`
+	Name        string  `json:"name"`
+	Type        FlexInt `json:"type"`
+	API         string  `json:"api"`
+	Searchable  FlexInt `json:"searchable"`
+	QuickSearch FlexInt `json:"quickSearch"`
+	Filterable  FlexInt `json:"filterable"`
+	Changeable  FlexInt `json:"changeable,omitempty"`
+	PlayerType  FlexInt `json:"playerType,omitempty"`
+	Ext         any     `json:"ext,omitempty"`
+	Timeout     FlexInt `json:"timeout,omitempty"`
+	Style       *Style  `json:"style,omitempty"`
 }
 
 type Style struct {
@@ -55,11 +81,11 @@ type DOH struct {
 }
 
 type Live struct {
-	Name       string `json:"name"`
-	Type       int    `json:"type"`
-	URL        string `json:"url"`
-	PlayerType int    `json:"playerType,omitempty"`
-	UA         string `json:"ua,omitempty"`
+	Name       string  `json:"name"`
+	Type       FlexInt `json:"type"`
+	URL        string  `json:"url"`
+	PlayerType FlexInt `json:"playerType,omitempty"`
+	UA         string  `json:"ua,omitempty"`
 }
 
 func LoadData(uri string) ([]byte, error) {
