@@ -57,6 +57,39 @@ func TestMixRepo(t *testing.T) {
 	assert.Equal(t, "live1", result.Lives[0].Name)
 }
 
+func TestMixRepo_FieldNotExist(t *testing.T) {
+	mockSourcer := &MockSourcer{
+		sources: map[string]*Source{
+			"source1": {
+				data: []byte(`{"spider":"spider1","wallpaper":"wall1","logo":"logo1","sites":[{"key":"site1","name":"Site 1"}],"doh":[{"name":"doh1"}],"lives":[{"name":"live1"}]}`),
+			},
+			"source2": {
+				data: []byte(`{"spider":"spider2","wallpaper":"wall2","logo":"logo2","sites":[{"key":"site2","name":"Site 2"}],"doh":[{"name":"doh2"}],"lives":[{"name":"live2"}]}`),
+			},
+		},
+	}
+
+	cfg := &config.Config{
+		SingleRepoOpt: config.SingleRepoOpt{
+			Spider:    config.MixOpt{SourceName: "source1", Field: "non_existent_spider"},
+			Wallpaper: config.MixOpt{SourceName: "source2", Field: "non_existent_wallpaper"},
+			Logo:      config.MixOpt{SourceName: "source1", Field: "non_existent_logo"},
+			Sites:     config.ArrayMixOpt{MixOpt: config.MixOpt{SourceName: "source1", Field: "non_existent_sites"}},
+			DOH:       config.ArrayMixOpt{MixOpt: config.MixOpt{SourceName: "source2", Field: "non_existent_doh"}},
+			Lives:     config.ArrayMixOpt{MixOpt: config.MixOpt{SourceName: "source1", Field: "non_existent_lives"}},
+		},
+	}
+
+	result, err := MixRepo(cfg, mockSourcer)
+	assert.NoError(t, err)
+	assert.Equal(t, "http://localhost:0/v1/spider", result.Spider)
+	assert.Equal(t, "", result.Wallpaper)
+	assert.Equal(t, "", result.Logo)
+	assert.Empty(t, result.Sites)
+	assert.Empty(t, result.DOH)
+	assert.Empty(t, result.Lives)
+}
+
 func TestMixField(t *testing.T) {
 	mockSourcer := &MockSourcer{
 		sources: map[string]*Source{
@@ -70,8 +103,10 @@ func TestMixField(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "value1", result)
 
-	_, err = mixField(config.MixOpt{SourceName: "source1", Field: "non_existent"}, mockSourcer)
-	assert.Error(t, err)
+	// Test for non-existent field
+	result, err = mixField(config.MixOpt{SourceName: "source1", Field: "non_existent"}, mockSourcer)
+	assert.NoError(t, err)
+	assert.Equal(t, "", result)
 }
 
 func TestMixArrayField(t *testing.T) {
@@ -79,6 +114,9 @@ func TestMixArrayField(t *testing.T) {
 		sources: map[string]*Source{
 			"source1": {
 				data: []byte(`{"array":[{"key":"item1","value":"value1"},{"key":"item2","value":"value2"}]}`),
+			},
+			"source2": {
+				data: []byte(`{"non_array_field":"some_value"}`),
 			},
 		},
 	}
@@ -88,6 +126,7 @@ func TestMixArrayField(t *testing.T) {
 		Value string `json:"value"`
 	}
 
+	// Test with valid array
 	result, err := mixArrayField[TestItem](config.ArrayMixOpt{
 		MixOpt:   config.MixOpt{SourceName: "source1", Field: "array"},
 		FilterBy: "key",
@@ -98,6 +137,22 @@ func TestMixArrayField(t *testing.T) {
 	assert.Len(t, result, 1)
 	assert.Equal(t, "item1", result[0].Key)
 	assert.Equal(t, "value1", result[0].Value)
+
+	// Test with non-existent field
+	result, err = mixArrayField[TestItem](config.ArrayMixOpt{
+		MixOpt: config.MixOpt{SourceName: "source1", Field: "non_existent"},
+	}, mockSourcer)
+
+	assert.NoError(t, err)
+	assert.Len(t, result, 0)
+
+	// Test with non-array field
+	result, err = mixArrayField[TestItem](config.ArrayMixOpt{
+		MixOpt: config.MixOpt{SourceName: "source2", Field: "non_array_field"},
+	}, mockSourcer)
+
+	assert.NoError(t, err)
+	assert.Len(t, result, 0)
 }
 
 func TestFilterArray(t *testing.T) {
@@ -183,4 +238,17 @@ func TestMixMultiRepo(t *testing.T) {
 	assert.Equal(t, "TvBox MixProxy", filteredResult.Repos[0].Name)
 	assert.Contains(t, filteredResult.Repos[0].URL, "/repo")
 	assert.Equal(t, "Repo 1", filteredResult.Repos[1].Name)
+
+	// 添加新的测试用例，测试字段不存在的情况
+	cfg.MultiRepoOpt.Repos = append(cfg.MultiRepoOpt.Repos, config.ArrayMixOpt{
+		MixOpt: config.MixOpt{
+			SourceName: "multi_source",
+			Field:      "non_existent_field",
+		},
+	})
+
+	result, err = MixMultiRepo(cfg, mockSourcer)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Len(t, result.Repos, 2) // 1 from single repo + 1 from existing multi_source
 }

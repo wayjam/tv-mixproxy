@@ -31,6 +31,25 @@ func (c *Config) Fixture() {
 		c.MultiRepoOpt.Repos[i].Field = "urls"
 		c.MultiRepoOpt.Repos[i].FilterBy = "name"
 	}
+
+	if c.SingleRepoOpt.Fallback.SourceName != "" {
+		c.fillFallbackSourceName(&c.SingleRepoOpt.Spider)
+		c.fillFallbackSourceName(&c.SingleRepoOpt.Wallpaper)
+		c.fillFallbackSourceName(&c.SingleRepoOpt.Logo)
+		c.fillFallbackSourceName(&c.SingleRepoOpt.Sites.MixOpt)
+		c.fillFallbackSourceName(&c.SingleRepoOpt.DOH.MixOpt)
+		c.fillFallbackSourceName(&c.SingleRepoOpt.Lives.MixOpt)
+		c.fillFallbackSourceName(&c.SingleRepoOpt.Parses.MixOpt)
+		c.fillFallbackSourceName(&c.SingleRepoOpt.Flags.MixOpt)
+		c.fillFallbackSourceName(&c.SingleRepoOpt.Rules.MixOpt)
+		c.fillFallbackSourceName(&c.SingleRepoOpt.Ads.MixOpt)
+	}
+}
+
+func (c *Config) fillFallbackSourceName(opt *MixOpt) {
+	if opt.SourceName == "" {
+		opt.SourceName = c.SingleRepoOpt.Fallback.SourceName
+	}
 }
 
 type LogOpt struct {
@@ -50,6 +69,7 @@ type SingleRepoOpt struct {
 	Flags     ArrayMixOpt `mapstructure:"flags"`
 	Rules     ArrayMixOpt `mapstructure:"rules"`
 	Ads       ArrayMixOpt `mapstructure:"ads"`
+	Fallback  MixOpt      `mapstructure:"fallback"` // 降级配置
 }
 
 type MultiRepoOpt struct {
@@ -61,6 +81,7 @@ type MultiRepoOpt struct {
 type MixOpt struct {
 	SourceName string `mapstructure:"source_name"`
 	Field      string `mapstructure:"field"`
+	Disabled   bool   `mapstructure:"disabled"` // 是否禁用该字段
 }
 
 type ArrayMixOpt struct {

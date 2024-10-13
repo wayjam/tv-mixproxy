@@ -22,7 +22,7 @@ var (
 func NewMixURLHandler(
 	mixOpt config.MixOpt, sourcer Sourcer,
 ) (fiber.Handler, error) {
-	if mixOpt.SourceName == "" {
+	if mixOpt.Disabled || mixOpt.SourceName == "" {
 		return nullHandler, nil
 	}
 
@@ -70,17 +70,19 @@ func MixRepo(
 	singleRepoOpt := cfg.SingleRepoOpt
 
 	// 混合 spider 字段
-	if singleRepoOpt.Spider.SourceName != "" {
+	if !singleRepoOpt.Spider.Disabled && singleRepoOpt.Spider.SourceName != "" {
 		spider, source, err := mixFieldAndGetSource(singleRepoOpt.Spider, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing spider: %w", err)
 		}
-		spider = fullFillURL(spider, source)
-		result.Spider = spider
+		if spider != "" {
+			spider = fullFillURL(spider, source)
+			result.Spider = spider
+		}
 	}
 
 	// 混合 wallpaper 字段
-	if singleRepoOpt.Wallpaper.SourceName != "" {
+	if !singleRepoOpt.Wallpaper.Disabled && singleRepoOpt.Wallpaper.SourceName != "" {
 		wallpaper, err := mixField(singleRepoOpt.Wallpaper, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing wallpaper: %w", err)
@@ -89,7 +91,7 @@ func MixRepo(
 	}
 
 	// 混合 logo 字段
-	if singleRepoOpt.Logo.SourceName != "" {
+	if !singleRepoOpt.Logo.Disabled && singleRepoOpt.Logo.SourceName != "" {
 		logo, err := mixField(singleRepoOpt.Logo, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing logo: %w", err)
@@ -98,7 +100,7 @@ func MixRepo(
 	}
 
 	// 混合 sites 数组
-	if singleRepoOpt.Sites.SourceName != "" {
+	if !singleRepoOpt.Sites.Disabled && singleRepoOpt.Sites.SourceName != "" {
 		sites, source, err := mixArrayFieldAndGetSource[config.Site](singleRepoOpt.Sites, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing sites: %w", err)
@@ -111,16 +113,20 @@ func MixRepo(
 	}
 
 	// 混合 doh 数组
-	if singleRepoOpt.DOH.SourceName != "" {
-		doh, err := mixArrayField[config.DOH](singleRepoOpt.DOH, sourcer)
+	if !singleRepoOpt.DOH.Disabled && singleRepoOpt.DOH.SourceName != "" {
+		doh, source, err := mixArrayFieldAndGetSource[config.DOH](singleRepoOpt.DOH, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing doh: %w", err)
 		}
-		result.DOH = doh
+		// 处理 DOH 结构体的特殊字段
+		for i := range doh {
+			dohItem := processDOHFields(doh[i], source)
+			result.DOH = append(result.DOH, dohItem)
+		}
 	}
 
 	// 混合 lives 数组
-	if singleRepoOpt.Lives.SourceName != "" {
+	if !singleRepoOpt.Lives.Disabled && singleRepoOpt.Lives.SourceName != "" {
 		lives, source, err := mixArrayFieldAndGetSource[config.Live](singleRepoOpt.Lives, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing lives: %w", err)
@@ -133,16 +139,20 @@ func MixRepo(
 	}
 
 	// 混合 parses 数组
-	if singleRepoOpt.Parses.SourceName != "" {
-		parses, err := mixArrayField[config.Parse](singleRepoOpt.Parses, sourcer)
+	if !singleRepoOpt.Parses.Disabled && singleRepoOpt.Parses.SourceName != "" {
+		parses, source, err := mixArrayFieldAndGetSource[config.Parse](singleRepoOpt.Parses, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing parses: %w", err)
 		}
-		result.Parses = parses
+		// 处理 Parse 结构体的特殊字段
+		for i := range parses {
+			parse := processParseFields(parses[i], source)
+			result.Parses = append(result.Parses, parse)
+		}
 	}
 
 	// 混合 flags 数组
-	if singleRepoOpt.Flags.SourceName != "" {
+	if !singleRepoOpt.Flags.Disabled && singleRepoOpt.Flags.SourceName != "" {
 		flags, err := mixArrayField[string](singleRepoOpt.Flags, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing flags: %w", err)
@@ -151,7 +161,7 @@ func MixRepo(
 	}
 
 	// 混合 rules 数组
-	if singleRepoOpt.Rules.SourceName != "" {
+	if !singleRepoOpt.Rules.Disabled && singleRepoOpt.Rules.SourceName != "" {
 		rules, err := mixArrayField[config.Rule](singleRepoOpt.Rules, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing rules: %w", err)
@@ -160,7 +170,7 @@ func MixRepo(
 	}
 
 	// 混合 ads 数组
-	if singleRepoOpt.Ads.SourceName != "" {
+	if !singleRepoOpt.Ads.Disabled && singleRepoOpt.Ads.SourceName != "" {
 		ads, err := mixArrayField[string](singleRepoOpt.Ads, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing ads: %w", err)
@@ -190,7 +200,8 @@ func mixFieldAndGetSource(opt config.MixOpt, sourcer Sourcer) (string, *Source, 
 
 	value := gjson.GetBytes(source.Data(), opt.Field)
 	if !value.Exists() {
-		return "", source, fmt.Errorf("field %s not found in source %s", opt.Field, opt.SourceName)
+		// 如果字段不存在，返回空字符串而不是错误
+		return "", source, nil
 	}
 
 	return value.String(), source, nil
@@ -214,7 +225,8 @@ func mixArrayFieldAndGetSource[T any](opt config.ArrayMixOpt, sourcer Sourcer) (
 
 	array := gjson.GetBytes(source.Data(), opt.Field)
 	if !array.Exists() || !array.IsArray() {
-		return nil, source, fmt.Errorf("field %s not found or not an array in source %s", opt.Field, opt.SourceName)
+		// 如果字段不存在或不是数组，返回空切片而不是错误
+		return []T{}, source, nil
 	}
 
 	filteredArray, err := filterArray(array.Array(), opt)
@@ -292,11 +304,16 @@ func MixMultiRepo(
 	}
 
 	for _, repoMixOpt := range multiRepoOpt.Repos {
-		repos, err := mixArrayField[config.RepoURLConfig](repoMixOpt, sourcer)
-		if err != nil {
-			return result, fmt.Errorf("mixing repos: %w", err)
+		if !repoMixOpt.Disabled {
+			repos, source, err := mixArrayFieldAndGetSource[config.RepoURLConfig](repoMixOpt, sourcer)
+			if err != nil {
+				return result, fmt.Errorf("mixing repos: %w", err)
+			}
+			for i := range repos {
+				repo := processMultiRepoFields(repos[i], source)
+				result.Repos = append(result.Repos, repo)
+			}
 		}
-		result.Repos = append(result.Repos, repos...)
 	}
 
 	return result, nil
@@ -349,5 +366,27 @@ func processLiveFields(item config.Live, source *Source) config.Live {
 		item.URL = fullFillURL(item.URL, source)
 	}
 
+	return item
+}
+
+func processMultiRepoFields(item config.RepoURLConfig, source *Source) config.RepoURLConfig {
+	if strings.HasPrefix(item.URL, "./") {
+		item.URL = fullFillURL(item.URL, source)
+	}
+
+	return item
+}
+
+func processDOHFields(item config.DOH, source *Source) config.DOH {
+	if strings.HasPrefix(item.URL, "./") {
+		item.URL = fullFillURL(item.URL, source)
+	}
+	return item
+}
+
+func processParseFields(item config.Parse, source *Source) config.Parse {
+	if strings.HasPrefix(item.URL, "./") {
+		item.URL = fullFillURL(item.URL, source)
+	}
 	return item
 }

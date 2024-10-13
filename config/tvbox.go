@@ -46,15 +46,15 @@ type RepoURLConfig struct {
 }
 
 type RepoConfig struct {
-	Spider    string   `json:"spider"`
-	Lives     []Live   `json:"lives"`
-	Wallpaper string   `json:"wallpaper"`
-	Sites     []Site   `json:"sites"`
-	Parses    []Parse  `json:"parses"`
-	Flags     []string `json:"flags"`
-	DOH       []DOH    `json:"doh"`
-	Rules     []Rule   `json:"rules"`
-	Ads       []string `json:"ads"`
+	Spider    string   `json:"spider,omitempty"`
+	Lives     []Live   `json:"lives,omitempty"`
+	Wallpaper string   `json:"wallpaper,omitempty"`
+	Sites     []Site   `json:"sites,omitempty"`
+	Parses    []Parse  `json:"parses,omitempty"`
+	Flags     []string `json:"flags,omitempty"`
+	DOH       []DOH    `json:"doh,omitempty"`
+	Rules     []Rule   `json:"rules,omitempty"`
+	Ads       []string `json:"ads,omitempty"`
 	Logo      string   `json:"logo,omitempty"` // 保留原有字段
 }
 
@@ -62,10 +62,10 @@ type Site struct {
 	Key         string  `json:"key"`
 	Name        string  `json:"name"`
 	Type        FlexInt `json:"type"`
-	API         string  `json:"api"`
-	Searchable  FlexInt `json:"searchable"`
-	QuickSearch FlexInt `json:"quickSearch"`
-	Filterable  FlexInt `json:"filterable"`
+	API         string  `json:"api,omitempty"`
+	Searchable  FlexInt `json:"searchable,omitempty"`
+	QuickSearch FlexInt `json:"quickSearch,omitempty"`
+	Filterable  FlexInt `json:"filterable,omitempty"`
 	Ext         any     `json:"ext,omitempty"`
 	Jar         string  `json:"jar,omitempty"`
 	PlayerType  FlexInt `json:"playerType,omitempty"`
