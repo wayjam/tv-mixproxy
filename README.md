@@ -10,6 +10,11 @@ TVBox MixProxy 是一个用于混合不同 TVBox 配置并提供服务的工具�
 
 ## 部署
 
+### 二进制
+
+- 执行编译 `make build`
+- 执行 `./tvbox-mixproxy --config config.yaml`
+
 ### Docker
 
 > 如果需要 mix 本地配置，请将配置也挂载到容器中
@@ -27,8 +32,9 @@ TVBox MixProxy 提供以下 API 接口：
 
 1. `/logo`: 获取 Logo 图片
 2. `/wallpaper`: 获取壁纸图片
-3. `/v1/repo`: 获取混合后的单仓配置
-4. `/v1/multi_repo`: 获取混合后的多仓配置
+3. `/spider`: 代理单仓的 spider 配置
+4. `/v1/repo`: 获取混合后的单仓配置
+5. `/v1/multi_repo`: 获取混合后的多仓配置
 
 ## 配置说明
 
@@ -47,12 +53,19 @@ sources:
     url: "https://example.com/main_source.json"  # 源地址
     type: "single"  # 源类型，single表示单仓
     interval: 3600  # 更新间隔，单位为秒
+  - name: "foo_source"
+    url: "https://foo.com/main_source.json"
+    type: "single"
+    disabled: true
+  - name: "foo_source"
+    url: "https://bar.com/main_source.json"
+    type: "single"
   - name: "multi_source"
     url: "file:///app/multi.json"  # 本地文件源
     type: "multi"  # 多仓源
     interval: 7200
 
-single_repo_opt:
+single_repo_opt: # 单仓配置
   disable: false  # 是否禁用单仓配置
   spider:
     source_name: "main_source"  # 使用main_source的spider配置
@@ -61,14 +74,15 @@ single_repo_opt:
   logo:
     source_name: "main_source"  # 使用main_source的logo配置
   sites:
+    disabled: false  # 是否禁用doh配置
     source_name: "main_source"  # 使用main_source的sites配置
     filter_by: "key"  # 按key进行过滤
     include: ".*"  # 包含所有站点
     exclude: "^adult_"  # 排除以adult_开头的站点
-  doh:
+  doh: # lives/parses/flags/ijk
     source_name: "main_source"  # 使用main_source的doh配置
-  lives:
-    source_name: "main_source"  # 使用main_source的lives配置
+  fallback:
+    source_name: "bar_source"  # 使用bar_source的fallback配置
 
 multi_repo_opt:
   disable: false  # 是否禁用多仓配置
@@ -87,4 +101,4 @@ multi_repo_opt:
 
 ## 贡献
 
-欢迎提交问题和拉取请求。对于重大更改，请先开启一个问题讨论您想要更改的内容。
+精力有限，测试环境有限，仅在自己的设备进行测试，欢迎提交问题和拉取请求。对于重大更改，请先开启一个 ISSUE 讨论想要更改的内容。
