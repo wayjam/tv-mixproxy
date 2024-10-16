@@ -87,7 +87,9 @@ func MixRepo(
 		if err != nil {
 			return result, fmt.Errorf("mixing wallpaper: %w", err)
 		}
-		result.Wallpaper = wallpaper
+		if wallpaper != "" {
+			result.Wallpaper = wallpaper
+		}
 	}
 
 	// 混合 logo 字段
@@ -96,7 +98,9 @@ func MixRepo(
 		if err != nil {
 			return result, fmt.Errorf("mixing logo: %w", err)
 		}
-		result.Logo = logo
+		if logo != "" {
+			result.Logo = logo
+		}
 	}
 
 	// 混合 sites 数组

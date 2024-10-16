@@ -23,7 +23,9 @@ type server struct {
 }
 
 func NewServer(cfg *config.Config) *server {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		AppName: "TVBox MixProxy",
+	})
 
 	app.Use(recoverer.New())
 	app.Use(requestid.New())

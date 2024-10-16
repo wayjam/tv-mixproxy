@@ -80,7 +80,7 @@ type MultiRepoOpt struct {
 
 type MixOpt struct {
 	SourceName string `mapstructure:"source_name"`
-	Field      string `mapstructure:"field"`
+	Field      string `mapstructure:"field"`    // 内部使用，无需配置
 	Disabled   bool   `mapstructure:"disabled"` // 是否禁用该字段
 }
 
