@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wayjam/tvbox-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/config"
 )
 
 type Sourcer interface {

@@ -1,4 +1,4 @@
-module github.com/wayjam/tvbox-mixproxy
+module github.com/wayjam/tv-mixproxy
 
 go 1.22.3
 

@@ -1,10 +1,10 @@
-# TVBox MixProxy
+# TV MixProxy
 
-TVBox MixProxy 是一个用于混合不同 TVBox 配置并提供服务的工具。它支持单仓配置和多仓配置，可以轻松地整合多个来源的 TVBox 配置。
+TV MixProxy 是一个用于混合不同 电视接口 并提供服务的工具。它支持单仓配置和多仓配置，可以轻松地整合多个来源配置。
 
 ## 功能特点
 
-- 支持单仓库和多仓库设置
+- 支持TVBox单仓库和TvBox多仓库设置
 - 可自定义不同配置字段的混合选项
 - 定期更新源配置
 
@@ -13,32 +13,30 @@ TVBox MixProxy 是一个用于混合不同 TVBox 配置并提供服务的工具�
 ### 二进制
 
 - 执行编译 `make build`
-- 执行 `./tvbox-mixproxy --config config.yaml`
+- 执行 `./tv-mixproxy --config config.yaml`
 
 ### Docker
 
 > 如果需要 mix 本地配置，请将配置也挂载到容器中
 
 ```bash
-docker run -d --name tvbox-mixproxy \
+docker run -d --name tv-mixproxy \
 -p 8080:8080 \
 -v $(pwd)/config.yaml:/app/config.yaml \
-ghcr.io/tvbox-mixproxy/tvbox-mixproxy:latest
+ghcr.io/tv-mixproxy/tv-mixproxy:latest
 ```
 
 ## 接口说明
 
-TVBox MixProxy 提供以下 API 接口：
-
 1. `/logo`: 获取 Logo 图片
 2. `/wallpaper`: 获取壁纸图片
-3. `/spider`: 代理单仓的 spider 配置
-4. `/v1/repo`: 获取混合后的单仓配置
-5. `/v1/multi_repo`: 获取混合后的多仓配置
+3. `/v1/tvbox_spider`: 代理单仓的 spider 配置
+4. `/v1/tvbox_repo`: 获取混合后的单仓配置
+5. `/v1/tvbox_multi_repo`: 获取混合后的多仓配置
 
 ## 配置说明
 
-TVBox MixProxy 使用 YAML 格式的配置文件。以下是主要配置项的说明：
+用 YAML 格式的配置文件。以下是主要配置项的说明：
 
 ```yaml
 server_port: 8080  # 服务器端口

@@ -5,7 +5,7 @@ all: build
 # Build the Go binary
 .PHONY: build
 build:
-	go build -o build/tvbox-mixproxy ./cmd/tvbox-mixproxy
+	go build -o build/tv-mixproxy ./cmd/tv-mixproxy
 
 .PHONY: vet
 vet:
@@ -19,7 +19,7 @@ test:
 # Build Docker image
 .PHONY: image
 image:
-	docker build -t ghcr.io/tvbox-mixproxy/tvbox-mixproxy:latest -f Dockerfile .
+	docker build -t ghcr.io/tv-mixproxy/tv-mixproxy:latest -f Dockerfile .
 
 # Clean up
 .PHONY: clean

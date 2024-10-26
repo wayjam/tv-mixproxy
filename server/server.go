@@ -12,8 +12,8 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/wayjam/tvbox-mixproxy/config"
-	"github.com/wayjam/tvbox-mixproxy/pkg/mixer"
+	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/mixer"
 )
 
 type server struct {
@@ -24,7 +24,7 @@ type server struct {
 
 func NewServer(cfg *config.Config) *server {
 	app := fiber.New(fiber.Config{
-		AppName: "TVBox MixProxy",
+		AppName: "TV MixProxy",
 	})
 
 	app.Use(recoverer.New())
@@ -69,9 +69,9 @@ func (s *server) SetupRoutes(app *fiber.App) {
 	app.Get("/wallpaper", Wallpaper)
 
 	v1 := app.Group("/v1")
-	v1.Get("/repo", NewRepoHandler(s.cfg, s.sourceManager))
-	v1.Get("/multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager))
-	v1.Get("/spider", NewSpiderHandler(s.cfg, s.sourceManager))
+	v1.Get("/tvbox_repo", NewRepoHandler(s.cfg, s.sourceManager))
+	v1.Get("/tvbox_multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager))
+	v1.Get("/tvbox_spider", NewSpiderHandler(s.cfg, s.sourceManager))
 }
 
 func (s *server) Run() error {

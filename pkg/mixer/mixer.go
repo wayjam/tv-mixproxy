@@ -10,7 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/proxy"
 	"github.com/tidwall/gjson"
 
-	"github.com/wayjam/tvbox-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/config"
 )
 
 var (
@@ -65,7 +65,7 @@ func MixRepo(
 	result := &config.RepoConfig{
 		Wallpaper: getExternalURL(cfg) + "/wallpaper?bg_color=333333&border_width=5&border_color=666666",
 		Logo:      getExternalURL(cfg) + "/logo",
-		Spider:    getExternalURL(cfg) + "/v1/spider",
+		Spider:    getExternalURL(cfg) + "/v1/tvbox_spider",
 	}
 	singleRepoOpt := cfg.SingleRepoOpt
 
@@ -302,8 +302,8 @@ func MixMultiRepo(
 	// 如果需要包含单仓源
 	if multiRepoOpt.IncludeSingleRepo {
 		result.Repos = append(result.Repos, config.RepoURLConfig{
-			Name: "TvBox MixProxy",
-			URL:  getExternalURL(cfg) + "/v1/repo",
+			Name: "Tv MixProxy",
+			URL:  getExternalURL(cfg) + "/v1/tvbox_repo",
 		})
 	}
 

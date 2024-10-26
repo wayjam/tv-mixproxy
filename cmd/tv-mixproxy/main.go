@@ -5,16 +5,16 @@ import (
 	"log"
 
 	"github.com/spf13/cobra"
-	"github.com/wayjam/tvbox-mixproxy/config"
-	"github.com/wayjam/tvbox-mixproxy/server"
+	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/server"
 )
 
 func main() {
 	var cfgFile string
 	var port int
 	rootCmd := &cobra.Command{
-		Use:   "tvbox-mixproxy",
-		Short: "TVBox MixProxy server",
+		Use:   "tv-mixproxy",
+		Short: "TV MixProxy server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.LoadServerConfig(cfgFile)
 			if err != nil {
@@ -30,7 +30,7 @@ func main() {
 		},
 	}
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.tvbox_mixproxy.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.tv_mixproxy.yaml)")
 	rootCmd.PersistentFlags().IntVar(&port, "port", 8080, "server port (overrides config file if specified)")
 
 	if err := rootCmd.Execute(); err != nil {

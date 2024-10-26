@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wayjam/tvbox-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/config"
 )
 
 func TestNewSourceManager(t *testing.T) {

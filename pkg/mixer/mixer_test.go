@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
-	"github.com/wayjam/tvbox-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/config"
 )
 
 // MockSourcer 是一个模拟的 Sourcer 实现
@@ -82,9 +82,9 @@ func TestMixRepo_FieldNotExist(t *testing.T) {
 
 	result, err := MixRepo(cfg, mockSourcer)
 	assert.NoError(t, err)
-	assert.Equal(t, "http://localhost:0/v1/spider", result.Spider)
-	assert.Equal(t, "", result.Wallpaper)
-	assert.Equal(t, "", result.Logo)
+	assert.Equal(t, "http://localhost:0/v1/tvbox_spider", result.Spider)
+	assert.Contains(t, result.Wallpaper, "localhost")
+	assert.Contains(t, result.Logo, "localhost")
 	assert.Empty(t, result.Sites)
 	assert.Empty(t, result.DOH)
 	assert.Empty(t, result.Lives)
@@ -221,8 +221,8 @@ func TestMixMultiRepo(t *testing.T) {
 	assert.NotNil(t, result)
 
 	assert.Len(t, result.Repos, 4) // 3 from multi_source + 1 single repo
-	assert.Equal(t, "TvBox MixProxy", result.Repos[0].Name)
-	assert.Contains(t, result.Repos[0].URL, "/repo")
+	assert.Equal(t, "Tv MixProxy", result.Repos[0].Name)
+	assert.Contains(t, result.Repos[0].URL, "/tvbox_repo")
 	assert.Equal(t, "Repo 1", result.Repos[1].Name)
 	assert.Equal(t, "Repo 2", result.Repos[2].Name)
 	assert.Equal(t, "Repo 3", result.Repos[3].Name)
@@ -235,8 +235,8 @@ func TestMixMultiRepo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, filteredResult)
 	assert.Len(t, filteredResult.Repos, 2) // 1 filtered from multi_source + 1 single repo
-	assert.Equal(t, "TvBox MixProxy", filteredResult.Repos[0].Name)
-	assert.Contains(t, filteredResult.Repos[0].URL, "/repo")
+	assert.Equal(t, "Tv MixProxy", filteredResult.Repos[0].Name)
+	assert.Contains(t, filteredResult.Repos[0].URL, "/tvbox_repo")
 	assert.Equal(t, "Repo 1", filteredResult.Repos[1].Name)
 
 	// 添加新的测试用例，测试字段不存在的情况

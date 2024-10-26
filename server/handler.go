@@ -5,13 +5,13 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/wayjam/tvbox-mixproxy/config"
-	"github.com/wayjam/tvbox-mixproxy/pkg/imageutil"
-	"github.com/wayjam/tvbox-mixproxy/pkg/mixer"
+	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/imageutil"
+	"github.com/wayjam/tv-mixproxy/pkg/mixer"
 )
 
 func Home(c fiber.Ctx) error {
-	return c.SendString("Hello, TVBox MixProxy 👋!")
+	return c.SendString("Hello, TV MixProxy 📺!")
 }
 
 func Logo(c fiber.Ctx) error {
