@@ -1,0 +1,88 @@
+name: 0x📦 Release New Version
+run-name: 📦 Release ${{ inputs.semver }} by @${{ github.actor }} ${{ inputs.dry_run && '(🧪 Dry-Run)' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      semver:
+        type: choice
+        description: Which version you want to increment?
+        options:
+          - patch
+          - minor
+          - major
+        required: true
+      custom_version:
+        description: Manual Custom Version (Special Purpose, v*)
+        type: string
+        required: false
+      dry_run:
+        description: "Dry run?"
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          registry-url: https://registry.npmjs.org/
+
+      - name: Setup semver
+        run: npm install -g semver
+
+      - name: Handle Version Number
+        run: |
+          PREV_VERSION="$(git describe --tags --abbrev=0 --match 'v*')"
+
+          if [ -n "${{ inputs.custom_version }}" ]; then
+            NEXT_VERSION="${{ inputs.custom_version }}"
+          else
+            NEXT_VERSION="v$(semver --increment ${{ inputs.semver }} ${PREV_VERSION})"
+          fi
+
+          echo "PREV_VERSION=${PREV_VERSION}" >> $GITHUB_ENV
+          echo "VERSION=${NEXT_VERSION}" >> $GITHUB_ENV
+
+      - name: Print Next Version
+        run: echo "${VERSION}"
+
+      - name: Setup git-chglog
+        run: |
+          curl -sL $(curl -s https://api.github.com/repos/git-chglog/git-chglog/releases/latest \
+            | grep -oP '"https://.+linux_amd64.tar.gz"' | tr -d \") | tar -C /usr/local/bin -xz git-chglog
+          git-chglog --version
+
+      - name: Version Changelog
+        id: changelog
+        run: |
+          # prepend changelog
+          changelog=$(git-chglog --config .github/chglog/config.yml --next-tag "${VERSION}" "${VERSION}")
+          echo "changelog=${changelog}\n" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ env.VERSION }}
+
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.tag_version.outputs.VERSION }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.changelog.outputs.changelog }}

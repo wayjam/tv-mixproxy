@@ -6,15 +6,21 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/internal"
 	"github.com/wayjam/tv-mixproxy/server"
 )
 
 func main() {
 	var cfgFile string
 	var port int
+
 	rootCmd := &cobra.Command{
 		Use:   "tv-mixproxy",
 		Short: "TV MixProxy server",
+		Version: fmt.Sprintf(
+			"%s\nGit Revision: %s\nBuild Time: %s\nGo Version: %s",
+			internal.Version, internal.GitRev, internal.BuildTime, internal.GoVersion,
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.LoadServerConfig(cfgFile)
 			if err != nil {
