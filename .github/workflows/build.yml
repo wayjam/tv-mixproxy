@@ -4,7 +4,9 @@ run-name: Build and Publish (${{ github.ref }}) ${{ inputs.dry_run && '(🧪 Dry
 on:
   push:
     tags:
-      - 'v*'
+      - v*
+  release:
+    types: [published, released]
 
   workflow_dispatch:
     inputs:
@@ -16,6 +18,11 @@ on:
         description: "Build items"
         type: string
         default: "binary,docker"
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
 
 jobs:
   # Get the current tag

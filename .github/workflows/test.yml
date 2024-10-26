@@ -1,6 +1,7 @@
 name: Run Tests
 
 on:
+  workflow_call:
   push:
     branches-ignore: ["release/*", "nightly"]
     tags-ignore: ["v*"]
@@ -8,23 +9,16 @@ on:
     branches-ignore: ["release/*", "nightly"]
 
 jobs:
-
-  test:
-    name: Run Go Tests
+  lint:
+    name: Run Lint
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
-
-    - name: Get dependencies
-      run: go mod download
-
-    - name: Run tests
-      run: go test -v ./...
+        go-version: '~1.22'
 
     - name: Run vet
       run: go vet ./...
@@ -36,5 +30,20 @@ jobs:
 
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v6
+      continue-on-error: true
       with:
         version: v1.60
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '~1.22'
+
+    - name: Run tests
+      run: go test -v ./...

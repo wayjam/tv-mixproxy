@@ -1,5 +1,5 @@
 name: 0x📦 Release New Version
-run-name: 📦 Release ${{ inputs.semver }} by @${{ github.actor }} ${{ inputs.dry_run && '(🧪 Dry-Run)' || '' }}
+run-name: 📦 Release ${{ inputs.semver }}/${{ inputs.custom_version }} by @${{ github.actor }} ${{ inputs.dry_run && '(🧪 Dry-Run)' || '' }}
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ on:
           - major
         required: true
       custom_version:
-        description: Manual Custom Version (Special Purpose, v*)
+        description: Manual Custom Version (Special Purpose, e.g. 1.0.0)
         type: string
         required: false
       dry_run:
@@ -22,67 +22,61 @@ on:
         default: false
 
 jobs:
+  check_tests:
+    runs-on: ubuntu-latest
+    permissions:
+        contents: read
+    outputs:
+      should_test: ${{ steps.check.outputs.should_test }}
+    steps:
+      - name: Check if tests have already run
+        id: check
+        run: |
+          CHECK_RUNS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs")
+          ALL_PASSED=$(echo "$CHECK_RUNS" | jq -r '.check_runs | all(.conclusion == "success")')
+          echo "ALL_PASSED=$ALL_PASSED"
+          if [ "$ALL_PASSED" == "true" ]; then
+            echo "All tests have already passed for this commit. Skipping tests."
+            echo "should_test=false" >> $GITHUB_OUTPUT
+          else
+            echo "Some tests haven't run or passed for this commit. Running tests."
+            echo "should_test=true" >> $GITHUB_OUTPUT
+          fi
   test:
+    needs: check_tests
+    if: needs.check_tests.outputs.should_test == 'true'
     uses: ./.github/workflows/test.yml
 
   release:
-    needs: test
+    needs: [check_tests, test]
+    if: always() && (needs.check_tests.outputs.should_test == 'false' || needs.test.result == 'success')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: master
-          fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          registry-url: https://registry.npmjs.org/
-
-      - name: Setup semver
-        run: npm install -g semver
-
-      - name: Handle Version Number
-        run: |
-          PREV_VERSION="$(git describe --tags --abbrev=0 --match 'v*')"
-
-          if [ -n "${{ inputs.custom_version }}" ]; then
-            NEXT_VERSION="${{ inputs.custom_version }}"
-          else
-            NEXT_VERSION="v$(semver --increment ${{ inputs.semver }} ${PREV_VERSION})"
-          fi
-
-          echo "PREV_VERSION=${PREV_VERSION}" >> $GITHUB_ENV
-          echo "VERSION=${NEXT_VERSION}" >> $GITHUB_ENV
-
-      - name: Print Next Version
-        run: echo "${VERSION}"
-
-      - name: Setup git-chglog
-        run: |
-          curl -sL $(curl -s https://api.github.com/repos/git-chglog/git-chglog/releases/latest \
-            | grep -oP '"https://.+linux_amd64.tar.gz"' | tr -d \") | tar -C /usr/local/bin -xz git-chglog
-          git-chglog --version
-
-      - name: Version Changelog
-        id: changelog
-        run: |
-          # prepend changelog
-          changelog=$(git-chglog --config .github/chglog/config.yml --next-tag "${VERSION}" "${VERSION}")
-          echo "changelog=${changelog}\n" >> "$GITHUB_OUTPUT"
 
       - name: Bump version and push tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: ${{ env.VERSION }}
+          default_bump: ${{ inputs.semver }}
+          custom_tag: ${{ inputs.custom_version }}
 
       - name: Create a GitHub release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ steps.tag_version.outputs.VERSION }}
+          tag: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}
-          body: ${{ steps.changelog.outputs.changelog }}
+          body: ${{ steps.tag_version.outputs.changelog }}
+          draft: ${{ inputs.dry_run }}
+
+      - name: Dispatch Build
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: build.yml
+          inputs: '{ "dry_run": ${{ inputs.dry_run }} }'

@@ -81,7 +81,6 @@ func (s *server) Run() error {
 		if err != nil {
 			return fmt.Errorf("failed to initialize MixRepo: %w", err)
 		}
-
 	}
 
 	if !s.cfg.MultiRepoOpt.Disable {

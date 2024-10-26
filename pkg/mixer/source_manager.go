@@ -56,7 +56,7 @@ func (s *Source) Name() string {
 	return s.config.Name
 }
 
-func (s *Source) GetSource(name string) ([]byte, error) {
+func (s *Source) GetSource(_ string) ([]byte, error) {
 	return s.data, nil
 }
 

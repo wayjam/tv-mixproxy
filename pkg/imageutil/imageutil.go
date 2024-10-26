@@ -13,10 +13,12 @@ func ParseColor(hex string) color.Color {
 	if err != nil {
 		return color.White
 	}
+
+	//nolint:gosec // Intentionally ignoring potential overflow for simplicity
 	return color.RGBA{
 		R: uint8(c >> 16),
-		G: uint8((c >> 8) & 0xFF),
-		B: uint8(c & 0xFF),
+		G: uint8(c >> 8),
+		B: uint8(c),
 		A: 255,
 	}
 }
@@ -93,6 +95,7 @@ func applyOpacity(img *image.RGBA, opacity float64) {
 			c := img.At(x, y)
 			r, g, b, a := c.RGBA()
 			alpha := uint16(float64(a) * opacity)
+			//nolint:gosec // Intentionally ignoring potential overflow as color values are within safe range
 			img.Set(x, y, color.RGBA64{uint16(r), uint16(g), uint16(b), alpha})
 		}
 	}

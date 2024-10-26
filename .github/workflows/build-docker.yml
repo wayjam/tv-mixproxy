@@ -12,11 +12,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag for the Docker image'
+        description: "Version tag for the Docker image"
         required: true
         type: string
       dry_run:
-        description: 'Dry run (true/false)'
+        description: "Dry run (true/false)"
         required: true
         type: boolean
         default: false
@@ -26,7 +26,6 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
-
 
 jobs:
   build-and-push:
@@ -52,40 +51,44 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Prepare Version
+        id: prepare_version
+        run: |
+          enable_ref="false"
+          enable_raw="false"
+          if [ -z "${{ inputs.version }}" ]; then
+            enable_ref="true"
+          else
+            enable_raw="true"
+          fi
+          echo "enable_ref=${enable_ref}" >> $GITHUB_OUTPUT
+          echo "enable_raw=${enable_raw}" >> $GITHUB_OUTPUT
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=auto
+          tags: |
+            type=ref,enable=${{ steps.prepare_version.outputs.enable_ref }},event=tag
+            type=raw,enable=${{ steps.prepare_version.outputs.enable_raw }},value=${{ inputs.version }}
 
-      - name: Get Version
-        id: version
-        run: |
-          if [ -z "${{ inputs.version }}" ]; then
-            echo "tag=${{ steps.meta.outputs.tags }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          fi
-          echo "The tag is ${{ steps.version.outputs.tag }}"
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
+          platforms: linux/amd64,linux/arm64
           context: .
           push: true
-          tags: ${{ steps.version.outputs.tag }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: VERSION=${{ steps.version.outputs.tag }}
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
-        with:
-          cosign-release: 'v2.2.4'
-
-      - name: Sign the published Docker image
-        env:
-          TAGS: ${{ steps.version.outputs.tag }}
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
