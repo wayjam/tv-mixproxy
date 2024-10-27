@@ -138,7 +138,7 @@ func (sm *SourceManager) refreshSource(name string) error {
 
 	sm.mu.Unlock()
 
-	data, err := config.LoadData(source.config.URL)
+	data, err := config.LoadTvBoxData(source.config.URL)
 
 	sm.mu.Lock()
 	defer sm.mu.Unlock()

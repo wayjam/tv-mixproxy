@@ -49,18 +49,18 @@ log:
 sources:
   - name: "main_source"  # 源名称
     url: "https://example.com/main_source.json"  # 源地址
-    type: "single"  # 源类型，single表示单仓
+    type: "tvbox_single"  # 源类型，tvbox_single表示单仓
     interval: 3600  # 更新间隔，单位为秒
   - name: "foo_source"
     url: "https://foo.com/main_source.json"
-    type: "single"
+    type: "tvbox_single"
     disabled: true
   - name: "foo_source"
     url: "https://bar.com/main_source.json"
-    type: "single"
+    type: "tvbox_single"
   - name: "multi_source"
     url: "file:///app/multi.json"  # 本地文件源
-    type: "multi"  # 多仓源
+    type: "tvbox_multi"  # 多仓源
     interval: 7200
 
 single_repo_opt: # 单仓配置

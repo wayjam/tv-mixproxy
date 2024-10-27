@@ -38,7 +38,7 @@ func TestLoadMultiRepoConfig(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Test loading from local file
-		config, err := LoadMultiRepoConfig("file://" + tempFile)
+		config, err := LoadTvBoxMultiRepoConfig("file://" + tempFile)
 		assert.NoError(t, err)
 		assert.NotNil(t, config)
 		assert.Len(t, config.Repos, 2)
@@ -55,7 +55,7 @@ func TestLoadMultiRepoConfig(t *testing.T) {
 		defer server.Close()
 
 		// Test loading from network URL
-		config, err := LoadMultiRepoConfig(server.URL)
+		config, err := LoadTvBoxMultiRepoConfig(server.URL)
 		assert.NoError(t, err)
 		assert.NotNil(t, config)
 		assert.Len(t, config.Repos, 2)
@@ -64,7 +64,7 @@ func TestLoadMultiRepoConfig(t *testing.T) {
 	})
 
 	t.Run("Unsupported URI scheme", func(t *testing.T) {
-		_, err := LoadMultiRepoConfig("ftp://example.com/config.json")
+		_, err := LoadTvBoxMultiRepoConfig("ftp://example.com/config.json")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported URI scheme")
 	})
@@ -76,7 +76,7 @@ func TestLoadMultiRepoConfig(t *testing.T) {
 		err := os.WriteFile(tempFile, []byte(invalidData), 0644)
 		assert.NoError(t, err)
 
-		_, err = LoadMultiRepoConfig("file://" + tempFile)
+		_, err = LoadTvBoxMultiRepoConfig("file://" + tempFile)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse JSON")
 	})

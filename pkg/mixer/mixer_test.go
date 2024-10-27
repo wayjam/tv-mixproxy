@@ -35,7 +35,7 @@ func TestMixRepo(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		SingleRepoOpt: config.SingleRepoOpt{
+		TvBoxSingleRepoOpt: config.TvBoxSingleRepoOpt{
 			Spider:    config.MixOpt{SourceName: "source1", Field: "spider"},
 			Wallpaper: config.MixOpt{SourceName: "source2", Field: "wallpaper"},
 			Logo:      config.MixOpt{}, // Empty source, should not be mixed
@@ -70,7 +70,7 @@ func TestMixRepo_FieldNotExist(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		SingleRepoOpt: config.SingleRepoOpt{
+		TvBoxSingleRepoOpt: config.TvBoxSingleRepoOpt{
 			Spider:    config.MixOpt{SourceName: "source1", Field: "non_existent_spider"},
 			Wallpaper: config.MixOpt{SourceName: "source2", Field: "non_existent_wallpaper"},
 			Logo:      config.MixOpt{SourceName: "source1", Field: "non_existent_logo"},
@@ -199,7 +199,7 @@ func TestMixMultiRepo(t *testing.T) {
 
 	// Test case 1: Without filtering
 	cfg := &config.Config{
-		MultiRepoOpt: config.MultiRepoOpt{
+		TvBoxMultiRepoOpt: config.TvBoxMultiRepoOpt{
 			IncludeSingleRepo: true,
 			Repos: []config.ArrayMixOpt{
 				{
@@ -209,7 +209,7 @@ func TestMixMultiRepo(t *testing.T) {
 				},
 			},
 		},
-		SingleRepoOpt: config.SingleRepoOpt{
+		TvBoxSingleRepoOpt: config.TvBoxSingleRepoOpt{
 			Spider: config.MixOpt{SourceName: "single_source", Field: "spider"},
 		},
 	}
@@ -228,8 +228,8 @@ func TestMixMultiRepo(t *testing.T) {
 	assert.Equal(t, "Repo 3", result.Repos[3].Name)
 
 	// Test case 2: With filtering
-	cfg.MultiRepoOpt.Repos[0].Include = "Repo [12]"
-	cfg.MultiRepoOpt.Repos[0].Exclude = "Repo 2"
+	cfg.TvBoxMultiRepoOpt.Repos[0].Include = "Repo [12]"
+	cfg.TvBoxMultiRepoOpt.Repos[0].Exclude = "Repo 2"
 
 	filteredResult, err := MixMultiRepo(cfg, mockSourcer)
 	assert.NoError(t, err)
@@ -240,7 +240,7 @@ func TestMixMultiRepo(t *testing.T) {
 	assert.Equal(t, "Repo 1", filteredResult.Repos[1].Name)
 
 	// 添加新的测试用例，测试字段不存在的情况
-	cfg.MultiRepoOpt.Repos = append(cfg.MultiRepoOpt.Repos, config.ArrayMixOpt{
+	cfg.TvBoxMultiRepoOpt.Repos = append(cfg.TvBoxMultiRepoOpt.Repos, config.ArrayMixOpt{
 		MixOpt: config.MixOpt{
 			SourceName: "multi_source",
 			Field:      "non_existent_field",

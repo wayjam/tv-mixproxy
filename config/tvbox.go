@@ -36,29 +36,29 @@ func (fi FlexInt) MarshalJSON() ([]byte, error) {
 	return json.Marshal(int(fi))
 }
 
-type MultiRepoConfig struct {
-	Repos []RepoURLConfig `json:"urls"`
+type TvBoxMultiRepoConfig struct {
+	Repos []TvBoxRepoURLConfig `json:"urls"`
 }
 
-type RepoURLConfig struct {
+type TvBoxRepoURLConfig struct {
 	URL  string `json:"url"`
 	Name string `json:"name"`
 }
 
-type RepoConfig struct {
-	Spider    string   `json:"spider,omitempty"`
-	Lives     []Live   `json:"lives,omitempty"`
-	Wallpaper string   `json:"wallpaper,omitempty"`
-	Sites     []Site   `json:"sites,omitempty"`
-	Parses    []Parse  `json:"parses,omitempty"`
-	Flags     []string `json:"flags,omitempty"`
-	DOH       []DOH    `json:"doh,omitempty"`
-	Rules     []Rule   `json:"rules,omitempty"`
-	Ads       []string `json:"ads,omitempty"`
-	Logo      string   `json:"logo,omitempty"` // 保留原有字段
+type TvBoxRepoConfig struct {
+	Spider    string       `json:"spider,omitempty"`
+	Lives     []TvBoxLive  `json:"lives,omitempty"`
+	Wallpaper string       `json:"wallpaper,omitempty"`
+	Sites     []TvBoxSite  `json:"sites,omitempty"`
+	Parses    []TvBoxParse `json:"parses,omitempty"`
+	Flags     []string     `json:"flags,omitempty"`
+	DOH       []TvBoxDOH   `json:"doh,omitempty"`
+	Rules     []TvBoxRule  `json:"rules,omitempty"`
+	Ads       []string     `json:"ads,omitempty"`
+	Logo      string       `json:"logo,omitempty"` // 保留原有字段
 }
 
-type Site struct {
+type TvBoxSite struct {
 	Key         string  `json:"key"`
 	Name        string  `json:"name"`
 	Type        FlexInt `json:"type"`
@@ -73,18 +73,18 @@ type Site struct {
 	Timeout     FlexInt `json:"timeout,omitempty"`
 }
 
-type Style struct {
+type TvBoxStyle struct {
 	Type  string  `json:"type"`
 	Ratio float64 `json:"ratio,omitempty"`
 }
 
-type DOH struct {
+type TvBoxDOH struct {
 	Name string   `json:"name"`
 	URL  string   `json:"url"`
 	IPs  []string `json:"ips"`
 }
 
-type Live struct {
+type TvBoxLive struct {
 	Name       string  `json:"name"`
 	Type       FlexInt `json:"type"`
 	URL        string  `json:"url"`
@@ -95,21 +95,21 @@ type Live struct {
 	Timeout    FlexInt `json:"timeout,omitempty"`
 }
 
-type Parse struct {
+type TvBoxParse struct {
 	Name string  `json:"name"`
 	Type FlexInt `json:"type"`
 	URL  string  `json:"url"`
 	Ext  any     `json:"ext,omitempty"`
 }
 
-type Rule struct {
+type TvBoxRule struct {
 	Name   string   `json:"name"`
 	Hosts  []string `json:"hosts"`
 	Regex  []string `json:"regex,omitempty"`
 	Script []string `json:"script,omitempty"`
 }
 
-func LoadData(uri string) ([]byte, error) {
+func LoadTvBoxData(uri string) ([]byte, error) {
 	var data []byte
 	var err error
 
@@ -142,8 +142,8 @@ func LoadData(uri string) ([]byte, error) {
 	return data, nil
 }
 
-func ParseMultiRepoConfig(data []byte) (*MultiRepoConfig, error) {
-	var config MultiRepoConfig
+func ParseTvBoxMultiRepoConfig(data []byte) (*TvBoxMultiRepoConfig, error) {
+	var config TvBoxMultiRepoConfig
 	err := json.Unmarshal(data, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %v", err)
@@ -151,8 +151,8 @@ func ParseMultiRepoConfig(data []byte) (*MultiRepoConfig, error) {
 	return &config, nil
 }
 
-func ParseTvBoxConfig(data []byte) (*RepoConfig, error) {
-	var config RepoConfig
+func ParseTvBoxConfig(data []byte) (*TvBoxRepoConfig, error) {
+	var config TvBoxRepoConfig
 	err := json.Unmarshal(data, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %v", err)
@@ -160,16 +160,16 @@ func ParseTvBoxConfig(data []byte) (*RepoConfig, error) {
 	return &config, nil
 }
 
-func LoadMultiRepoConfig(uri string) (*MultiRepoConfig, error) {
-	data, err := LoadData(uri)
+func LoadTvBoxMultiRepoConfig(uri string) (*TvBoxMultiRepoConfig, error) {
+	data, err := LoadTvBoxData(uri)
 	if err != nil {
 		return nil, err
 	}
-	return ParseMultiRepoConfig(data)
+	return ParseTvBoxMultiRepoConfig(data)
 }
 
-func LoadTvBoxConfig(uri string) (*RepoConfig, error) {
-	data, err := LoadData(uri)
+func LoadTvBoxConfig(uri string) (*TvBoxRepoConfig, error) {
+	data, err := LoadTvBoxData(uri)
 	if err != nil {
 		return nil, err
 	}

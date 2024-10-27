@@ -42,7 +42,7 @@ func NewMixURLHandler(
 		return nullHandler, fmt.Errorf("mixing url: %w", err)
 	}
 
-	if source.Type() != config.SourceTypeSingle {
+	if source.Type() != config.SourceTypeTvBoxSingle {
 		return nullHandler, fmt.Errorf("source %s should be a single source", mixOpt.SourceName)
 	}
 
@@ -61,13 +61,13 @@ func NewMixURLHandler(
 // MixRepo 函数根据配置混合多个单仓源
 func MixRepo(
 	cfg *config.Config, sourcer Sourcer,
-) (*config.RepoConfig, error) {
-	result := &config.RepoConfig{
+) (*config.TvBoxRepoConfig, error) {
+	result := &config.TvBoxRepoConfig{
 		Wallpaper: getExternalURL(cfg) + "/wallpaper?bg_color=333333&border_width=5&border_color=666666",
 		Logo:      getExternalURL(cfg) + "/logo",
 		Spider:    getExternalURL(cfg) + "/v1/tvbox_spider",
 	}
-	singleRepoOpt := cfg.SingleRepoOpt
+	singleRepoOpt := cfg.TvBoxSingleRepoOpt
 
 	// 混合 spider 字段
 	if !singleRepoOpt.Spider.Disabled && singleRepoOpt.Spider.SourceName != "" {
@@ -105,7 +105,7 @@ func MixRepo(
 
 	// 混合 sites 数组
 	if !singleRepoOpt.Sites.Disabled && singleRepoOpt.Sites.SourceName != "" {
-		sites, source, err := mixArrayFieldAndGetSource[config.Site](singleRepoOpt.Sites, sourcer)
+		sites, source, err := mixArrayFieldAndGetSource[config.TvBoxSite](singleRepoOpt.Sites, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing sites: %w", err)
 		}
@@ -118,7 +118,7 @@ func MixRepo(
 
 	// 混合 doh 数组
 	if !singleRepoOpt.DOH.Disabled && singleRepoOpt.DOH.SourceName != "" {
-		doh, source, err := mixArrayFieldAndGetSource[config.DOH](singleRepoOpt.DOH, sourcer)
+		doh, source, err := mixArrayFieldAndGetSource[config.TvBoxDOH](singleRepoOpt.DOH, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing doh: %w", err)
 		}
@@ -131,7 +131,7 @@ func MixRepo(
 
 	// 混合 lives 数组
 	if !singleRepoOpt.Lives.Disabled && singleRepoOpt.Lives.SourceName != "" {
-		lives, source, err := mixArrayFieldAndGetSource[config.Live](singleRepoOpt.Lives, sourcer)
+		lives, source, err := mixArrayFieldAndGetSource[config.TvBoxLive](singleRepoOpt.Lives, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing lives: %w", err)
 		}
@@ -144,7 +144,7 @@ func MixRepo(
 
 	// 混合 parses 数组
 	if !singleRepoOpt.Parses.Disabled && singleRepoOpt.Parses.SourceName != "" {
-		parses, source, err := mixArrayFieldAndGetSource[config.Parse](singleRepoOpt.Parses, sourcer)
+		parses, source, err := mixArrayFieldAndGetSource[config.TvBoxParse](singleRepoOpt.Parses, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing parses: %w", err)
 		}
@@ -166,7 +166,7 @@ func MixRepo(
 
 	// 混合 rules 数组
 	if !singleRepoOpt.Rules.Disabled && singleRepoOpt.Rules.SourceName != "" {
-		rules, err := mixArrayField[config.Rule](singleRepoOpt.Rules, sourcer)
+		rules, err := mixArrayField[config.TvBoxRule](singleRepoOpt.Rules, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing rules: %w", err)
 		}
@@ -292,16 +292,16 @@ func filterArray(array []gjson.Result, opt config.ArrayMixOpt) ([]gjson.Result, 
 // MixMultiRepo 函数根据配置混合多个多仓源
 func MixMultiRepo(
 	cfg *config.Config, sourcer Sourcer,
-) (*config.MultiRepoConfig, error) {
-	multiRepoOpt := cfg.MultiRepoOpt
+) (*config.TvBoxMultiRepoConfig, error) {
+	multiRepoOpt := cfg.TvBoxMultiRepoOpt
 
-	result := &config.MultiRepoConfig{
-		Repos: make([]config.RepoURLConfig, 0),
+	result := &config.TvBoxMultiRepoConfig{
+		Repos: make([]config.TvBoxRepoURLConfig, 0),
 	}
 
 	// 如果需要包含单仓源
 	if multiRepoOpt.IncludeSingleRepo {
-		result.Repos = append(result.Repos, config.RepoURLConfig{
+		result.Repos = append(result.Repos, config.TvBoxRepoURLConfig{
 			Name: "Tv MixProxy",
 			URL:  getExternalURL(cfg) + "/v1/tvbox_repo",
 		})
@@ -309,7 +309,7 @@ func MixMultiRepo(
 
 	for _, repoMixOpt := range multiRepoOpt.Repos {
 		if !repoMixOpt.Disabled {
-			repos, source, err := mixArrayFieldAndGetSource[config.RepoURLConfig](repoMixOpt, sourcer)
+			repos, source, err := mixArrayFieldAndGetSource[config.TvBoxRepoURLConfig](repoMixOpt, sourcer)
 			if err != nil {
 				return result, fmt.Errorf("mixing repos: %w", err)
 			}
@@ -346,7 +346,7 @@ func fullFillURL(url string, source *Source) string {
 	return url
 }
 
-func processSiteFields(item config.Site, source *Source) config.Site {
+func processSiteFields(item config.TvBoxSite, source *Source) config.TvBoxSite {
 	if strings.HasPrefix(item.API, "./") {
 		item.API = fullFillURL(item.API, source)
 	}
@@ -365,7 +365,7 @@ func processSiteFields(item config.Site, source *Source) config.Site {
 	return item
 }
 
-func processLiveFields(item config.Live, source *Source) config.Live {
+func processLiveFields(item config.TvBoxLive, source *Source) config.TvBoxLive {
 	if strings.HasPrefix(item.URL, "./") {
 		item.URL = fullFillURL(item.URL, source)
 	}
@@ -373,7 +373,7 @@ func processLiveFields(item config.Live, source *Source) config.Live {
 	return item
 }
 
-func processMultiRepoFields(item config.RepoURLConfig, source *Source) config.RepoURLConfig {
+func processMultiRepoFields(item config.TvBoxRepoURLConfig, source *Source) config.TvBoxRepoURLConfig {
 	if strings.HasPrefix(item.URL, "./") {
 		item.URL = fullFillURL(item.URL, source)
 	}
@@ -381,14 +381,14 @@ func processMultiRepoFields(item config.RepoURLConfig, source *Source) config.Re
 	return item
 }
 
-func processDOHFields(item config.DOH, source *Source) config.DOH {
+func processDOHFields(item config.TvBoxDOH, source *Source) config.TvBoxDOH {
 	if strings.HasPrefix(item.URL, "./") {
 		item.URL = fullFillURL(item.URL, source)
 	}
 	return item
 }
 
-func processParseFields(item config.Parse, source *Source) config.Parse {
+func processParseFields(item config.TvBoxParse, source *Source) config.TvBoxParse {
 	if strings.HasPrefix(item.URL, "./") {
 		item.URL = fullFillURL(item.URL, source)
 	}

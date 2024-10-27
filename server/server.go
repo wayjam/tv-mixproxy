@@ -75,7 +75,7 @@ func (s *server) SetupRoutes(app *fiber.App) {
 }
 
 func (s *server) Run() error {
-	if !s.cfg.SingleRepoOpt.Disable {
+	if !s.cfg.TvBoxSingleRepoOpt.Disable {
 		// Try MixRepo
 		_, err := mixer.MixRepo(s.cfg, s.sourceManager)
 		if err != nil {
@@ -83,7 +83,7 @@ func (s *server) Run() error {
 		}
 	}
 
-	if !s.cfg.MultiRepoOpt.Disable {
+	if !s.cfg.TvBoxMultiRepoOpt.Disable {
 		// Try MixMultiRepo
 		_, err := mixer.MixMultiRepo(s.cfg, s.sourceManager)
 		if err != nil {

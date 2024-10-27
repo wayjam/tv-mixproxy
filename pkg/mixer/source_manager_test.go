@@ -13,8 +13,8 @@ import (
 
 func TestNewSourceManager(t *testing.T) {
 	sources := []config.Source{
-		{Name: "test1", URL: "http://example.com/test1", Type: config.SourceTypeSingle, Interval: 60},
-		{Name: "test2", URL: "http://example.com/test2", Type: config.SourceTypeMulti, Interval: 120},
+		{Name: "test1", URL: "http://example.com/test1", Type: config.SourceTypeTvBoxSingle, Interval: 60},
+		{Name: "test2", URL: "http://example.com/test2", Type: config.SourceTypeTvBoxMulti, Interval: 120},
 	}
 
 	sm := NewSourceManager(sources)
@@ -28,16 +28,16 @@ func TestNewSourceManager(t *testing.T) {
 func TestGetSource(t *testing.T) {
 	// Setup a test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		config := config.RepoConfig{
+		config := config.TvBoxRepoConfig{
 			Spider: "test_spider",
-			Sites:  []config.Site{{Key: "test_site", Name: "Test Site"}},
+			Sites:  []config.TvBoxSite{{Key: "test_site", Name: "Test Site"}},
 		}
 		json.NewEncoder(w).Encode(config)
 	}))
 	defer server.Close()
 
 	sources := []config.Source{
-		{Name: "test", URL: server.URL, Type: config.SourceTypeSingle, Interval: 60},
+		{Name: "test", URL: server.URL, Type: config.SourceTypeTvBoxSingle, Interval: 60},
 	}
 
 	sm := NewSourceManager(sources)
@@ -47,7 +47,7 @@ func TestGetSource(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, data)
 
-	var config config.RepoConfig
+	var config config.TvBoxRepoConfig
 	err = json.Unmarshal(data.data, &config)
 	assert.NoError(t, err)
 	assert.Equal(t, "test_spider", config.Spider)
@@ -68,16 +68,16 @@ func TestRefreshSource(t *testing.T) {
 	callCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
-		config := config.RepoConfig{
+		config := config.TvBoxRepoConfig{
 			Spider: "test_spider",
-			Sites:  []config.Site{{Key: "test_site", Name: "Test Site"}},
+			Sites:  []config.TvBoxSite{{Key: "test_site", Name: "Test Site"}},
 		}
 		json.NewEncoder(w).Encode(config)
 	}))
 	defer server.Close()
 
 	sources := []config.Source{
-		{Name: "test", URL: server.URL, Type: config.SourceTypeSingle, Interval: 1}, // 1 second interval
+		{Name: "test", URL: server.URL, Type: config.SourceTypeTvBoxSingle, Interval: 1}, // 1 second interval
 	}
 
 	sm := NewSourceManager(sources)

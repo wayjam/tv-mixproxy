@@ -7,48 +7,48 @@ import (
 )
 
 type Config struct {
-	ServerPort    int           `mapstructure:"server_port"`     // 服务端口, 默认 8080
-	ExternalURL   string        `mapstructure:"external_url"`    // 外部访问地址, eg. http://localhost:8080
-	Log           LogOpt        `mapstructure:"log"`             // 日志配置
-	Sources       []Source      `mapstructure:"sources"`         // 源配置
-	SingleRepoOpt SingleRepoOpt `mapstructure:"single_repo_opt"` // 单仓源配置
-	MultiRepoOpt  MultiRepoOpt  `mapstructure:"multi_repo_opt"`  // 多仓源配置
+	ServerPort         int                `mapstructure:"server_port"`     // 服务端口, 默认 8080
+	ExternalURL        string             `mapstructure:"external_url"`    // 外部访问地址, eg. http://localhost:8080
+	Log                LogOpt             `mapstructure:"log"`             // 日志配置
+	Sources            []Source           `mapstructure:"sources"`         // 源配置
+	TvBoxSingleRepoOpt TvBoxSingleRepoOpt `mapstructure:"single_repo_opt"` // TvBox单仓源配置
+	TvBoxMultiRepoOpt  TvBoxMultiRepoOpt  `mapstructure:"multi_repo_opt"`  // TvBox多仓源配置
 }
 
 func (c *Config) Fixture() {
-	c.SingleRepoOpt.Spider.Field = "spider"
-	c.SingleRepoOpt.Wallpaper.Field = "wallpaper"
-	c.SingleRepoOpt.Logo.Field = "logo"
-	c.SingleRepoOpt.Sites.Field = "sites"
-	c.SingleRepoOpt.DOH.Field = "doh"
-	c.SingleRepoOpt.Lives.Field = "lives"
-	c.SingleRepoOpt.Parses.Field = "parses"
-	c.SingleRepoOpt.Flags.Field = "flags"
-	c.SingleRepoOpt.Rules.Field = "rules"
-	c.SingleRepoOpt.Ads.Field = "ads"
+	c.TvBoxSingleRepoOpt.Spider.Field = "spider"
+	c.TvBoxSingleRepoOpt.Wallpaper.Field = "wallpaper"
+	c.TvBoxSingleRepoOpt.Logo.Field = "logo"
+	c.TvBoxSingleRepoOpt.Sites.Field = "sites"
+	c.TvBoxSingleRepoOpt.DOH.Field = "doh"
+	c.TvBoxSingleRepoOpt.Lives.Field = "lives"
+	c.TvBoxSingleRepoOpt.Parses.Field = "parses"
+	c.TvBoxSingleRepoOpt.Flags.Field = "flags"
+	c.TvBoxSingleRepoOpt.Rules.Field = "rules"
+	c.TvBoxSingleRepoOpt.Ads.Field = "ads"
 
-	for i := range c.MultiRepoOpt.Repos {
-		c.MultiRepoOpt.Repos[i].Field = "urls"
-		c.MultiRepoOpt.Repos[i].FilterBy = "name"
+	for i := range c.TvBoxMultiRepoOpt.Repos {
+		c.TvBoxMultiRepoOpt.Repos[i].Field = "urls"
+		c.TvBoxMultiRepoOpt.Repos[i].FilterBy = "name"
 	}
 
-	if c.SingleRepoOpt.Fallback.SourceName != "" {
-		c.fillFallbackSourceName(&c.SingleRepoOpt.Spider)
-		c.fillFallbackSourceName(&c.SingleRepoOpt.Wallpaper)
-		c.fillFallbackSourceName(&c.SingleRepoOpt.Logo)
-		c.fillFallbackSourceName(&c.SingleRepoOpt.Sites.MixOpt)
-		c.fillFallbackSourceName(&c.SingleRepoOpt.DOH.MixOpt)
-		c.fillFallbackSourceName(&c.SingleRepoOpt.Lives.MixOpt)
-		c.fillFallbackSourceName(&c.SingleRepoOpt.Parses.MixOpt)
-		c.fillFallbackSourceName(&c.SingleRepoOpt.Flags.MixOpt)
-		c.fillFallbackSourceName(&c.SingleRepoOpt.Rules.MixOpt)
-		c.fillFallbackSourceName(&c.SingleRepoOpt.Ads.MixOpt)
+	if c.TvBoxSingleRepoOpt.Fallback.SourceName != "" {
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Spider)
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Wallpaper)
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Logo)
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Sites.MixOpt)
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.DOH.MixOpt)
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Lives.MixOpt)
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Parses.MixOpt)
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Flags.MixOpt)
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Rules.MixOpt)
+		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Ads.MixOpt)
 	}
 }
 
 func (c *Config) fillFallbackSourceName(opt *MixOpt) {
 	if opt.SourceName == "" {
-		opt.SourceName = c.SingleRepoOpt.Fallback.SourceName
+		opt.SourceName = c.TvBoxSingleRepoOpt.Fallback.SourceName
 	}
 }
 
@@ -57,7 +57,7 @@ type LogOpt struct {
 	Level  int    `mapstructure:"level"`  // 日志级别, 0: Trace, 1: Debug, 2: Info, 3: Warn, 4: Error, 5: Fatal, 6: Panic
 }
 
-type SingleRepoOpt struct {
+type TvBoxSingleRepoOpt struct {
 	Disable   bool        `mapstructure:"disable"` // 是否禁用单仓源
 	Spider    MixOpt      `mapstructure:"spider"`
 	Wallpaper MixOpt      `mapstructure:"wallpaper"`
@@ -72,7 +72,7 @@ type SingleRepoOpt struct {
 	Fallback  MixOpt      `mapstructure:"fallback"` // 降级配置
 }
 
-type MultiRepoOpt struct {
+type TvBoxMultiRepoOpt struct {
 	Disable           bool          `mapstructure:"disable"`             // 是否禁用多仓源
 	IncludeSingleRepo bool          `mapstructure:"include_single_repo"` // 是否包含代理的单仓源
 	Repos             []ArrayMixOpt `mapstructure:"repos"`               // 仓库配置
@@ -101,8 +101,8 @@ type Source struct {
 type SourceType string
 
 const (
-	SourceTypeSingle SourceType = "single" // 单仓源
-	SourceTypeMulti  SourceType = "multi"  // 多仓源
+	SourceTypeTvBoxSingle SourceType = "tvbox_single" // 单仓源
+	SourceTypeTvBoxMulti  SourceType = "tvbox_multi"  // 多仓源
 )
 
 func LoadServerConfig(cfgFile string) (*Config, error) {

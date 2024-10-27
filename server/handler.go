@@ -59,7 +59,7 @@ func Wallpaper(c fiber.Ctx) error {
 
 func NewRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		if cfg.SingleRepoOpt.Disable {
+		if cfg.TvBoxSingleRepoOpt.Disable {
 			return c.Status(fiber.StatusNotImplemented).SendString("SingleRepo is disabled")
 		}
 
@@ -74,7 +74,7 @@ func NewRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fibe
 
 func NewMultiRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		if cfg.MultiRepoOpt.Disable {
+		if cfg.TvBoxMultiRepoOpt.Disable {
 			return c.Status(fiber.StatusNotImplemented).SendString("MultiRepo is disabled")
 		}
 
@@ -88,7 +88,7 @@ func NewMultiRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager)
 }
 
 func NewSpiderHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
-	handler, err := mixer.NewMixURLHandler(cfg.SingleRepoOpt.Spider, sourceManager)
+	handler, err := mixer.NewMixURLHandler(cfg.TvBoxSingleRepoOpt.Spider, sourceManager)
 	if err != nil {
 		return func(c fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
