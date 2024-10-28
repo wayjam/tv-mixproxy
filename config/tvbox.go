@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -123,7 +124,13 @@ func LoadTvBoxData(uri string) ([]byte, error) {
 			return nil, fmt.Errorf("failed to fetch data from URL: %v", err)
 		}
 		defer resp.Body.Close()
+
+		if resp.StatusCode >= http.StatusBadRequest {
+			return nil, fmt.Errorf("failed to fetch data from URL: %s", resp.Status)
+		}
+
 		data, err = io.ReadAll(resp.Body)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to read data: %v", err)
 		}
@@ -142,18 +149,20 @@ func LoadTvBoxData(uri string) ([]byte, error) {
 	return data, nil
 }
 
-func ParseTvBoxMultiRepoConfig(data []byte) (*TvBoxMultiRepoConfig, error) {
+func ParseTvBoxMultiRepoConfig(r io.Reader) (*TvBoxMultiRepoConfig, error) {
 	var config TvBoxMultiRepoConfig
-	err := json.Unmarshal(data, &config)
+	decoder := json.NewDecoder(r)
+	err := decoder.Decode(&config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %v", err)
 	}
 	return &config, nil
 }
 
-func ParseTvBoxConfig(data []byte) (*TvBoxRepoConfig, error) {
+func ParseTvBoxConfig(r io.Reader) (*TvBoxRepoConfig, error) {
 	var config TvBoxRepoConfig
-	err := json.Unmarshal(data, &config)
+	decoder := json.NewDecoder(r)
+	err := decoder.Decode(&config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %v", err)
 	}
@@ -165,7 +174,7 @@ func LoadTvBoxMultiRepoConfig(uri string) (*TvBoxMultiRepoConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ParseTvBoxMultiRepoConfig(data)
+	return ParseTvBoxMultiRepoConfig(bytes.NewReader(data))
 }
 
 func LoadTvBoxConfig(uri string) (*TvBoxRepoConfig, error) {
@@ -173,5 +182,5 @@ func LoadTvBoxConfig(uri string) (*TvBoxRepoConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ParseTvBoxConfig(data)
+	return ParseTvBoxConfig(bytes.NewReader(data))
 }

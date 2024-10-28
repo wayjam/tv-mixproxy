@@ -138,7 +138,18 @@ func (sm *SourceManager) refreshSource(name string) error {
 
 	sm.mu.Unlock()
 
-	data, err := config.LoadTvBoxData(source.config.URL)
+	var data []byte
+	var err error
+	switch source.Type() {
+	case config.SourceTypeTvBoxSingle:
+		data, err = config.LoadTvBoxData(source.config.URL)
+	case config.SourceTypeTvBoxMulti:
+		data, err = config.LoadTvBoxData(source.config.URL)
+	case config.SourceTypeEPG:
+		data, err = config.LoadEPGData(source.config.URL)
+	case config.SourceTypeM3U8:
+		data, err = config.LoadM3U8Data(source.config.URL)
+	}
 
 	sm.mu.Lock()
 	defer sm.mu.Unlock()

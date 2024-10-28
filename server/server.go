@@ -72,12 +72,13 @@ func (s *server) SetupRoutes(app *fiber.App) {
 	v1.Get("/tvbox_repo", NewRepoHandler(s.cfg, s.sourceManager))
 	v1.Get("/tvbox_multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager))
 	v1.Get("/tvbox_spider", NewSpiderHandler(s.cfg, s.sourceManager))
+	v1.Get("/epg", NewEPGHandler(s.cfg, s.sourceManager))
 }
 
 func (s *server) Run() error {
 	if !s.cfg.TvBoxSingleRepoOpt.Disable {
 		// Try MixRepo
-		_, err := mixer.MixRepo(s.cfg, s.sourceManager)
+		_, err := mixer.MixTvBoxRepo(s.cfg, s.sourceManager)
 		if err != nil {
 			return fmt.Errorf("failed to initialize MixRepo: %w", err)
 		}

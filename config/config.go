@@ -7,12 +7,13 @@ import (
 )
 
 type Config struct {
-	ServerPort         int                `mapstructure:"server_port"`     // 服务端口, 默认 8080
-	ExternalURL        string             `mapstructure:"external_url"`    // 外部访问地址, eg. http://localhost:8080
-	Log                LogOpt             `mapstructure:"log"`             // 日志配置
-	Sources            []Source           `mapstructure:"sources"`         // 源配置
-	TvBoxSingleRepoOpt TvBoxSingleRepoOpt `mapstructure:"single_repo_opt"` // TvBox单仓源配置
-	TvBoxMultiRepoOpt  TvBoxMultiRepoOpt  `mapstructure:"multi_repo_opt"`  // TvBox多仓源配置
+	ServerPort         int                `mapstructure:"server_port"`           // 服务端口, 默认 8080
+	ExternalURL        string             `mapstructure:"external_url"`          // 外部访问地址, eg. http://localhost:8080
+	Log                LogOpt             `mapstructure:"log"`                   // 日志配置
+	Sources            []Source           `mapstructure:"sources"`               // 源配置
+	TvBoxSingleRepoOpt TvBoxSingleRepoOpt `mapstructure:"tvbox_single_repo_opt"` // TvBox单仓源配置
+	TvBoxMultiRepoOpt  TvBoxMultiRepoOpt  `mapstructure:"tvbox_multi_repo_opt"`  // TvBox多仓源配置
+	EPGOpt             EPGOpt             `mapstructure:"epg"`                   // EPG源配置
 }
 
 func (c *Config) Fixture() {
@@ -78,6 +79,21 @@ type TvBoxMultiRepoOpt struct {
 	Repos             []ArrayMixOpt `mapstructure:"repos"`               // 仓库配置
 }
 
+type EPGFilterType string
+
+const (
+	EPGFilterTypeChannelID    EPGFilterType = "channel_id"
+	EPGFilterTypeProgramTitle EPGFilterType = "program_title"
+)
+
+type EPGOpt struct {
+	Disable bool `mapstructure:"disable"` // 是否禁用EPG源
+	// 过滤频道配置
+	// 可根据 channel_id 或者 program_title 过滤
+	// 支持多个源
+	Filters []ArrayMixOpt `mapstructure:"filters"`
+}
+
 type MixOpt struct {
 	SourceName string `mapstructure:"source_name"`
 	Field      string `mapstructure:"field"`    // 内部使用，无需配置
@@ -101,8 +117,10 @@ type Source struct {
 type SourceType string
 
 const (
-	SourceTypeTvBoxSingle SourceType = "tvbox_single" // 单仓源
-	SourceTypeTvBoxMulti  SourceType = "tvbox_multi"  // 多仓源
+	SourceTypeTvBoxSingle SourceType = "tvbox_single" // tvbox单仓源
+	SourceTypeTvBoxMulti  SourceType = "tvbox_multi"  // tvbox多仓源
+	SourceTypeEPG         SourceType = "epg"          // epg源
+	SourceTypeM3U8        SourceType = "m3u8"         // m3u8源
 )
 
 func LoadServerConfig(cfgFile string) (*Config, error) {

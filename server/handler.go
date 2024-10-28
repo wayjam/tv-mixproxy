@@ -1,6 +1,8 @@
 package server
 
 import (
+	"compress/gzip"
+	"encoding/xml"
 	"image/png"
 	"strconv"
 
@@ -63,7 +65,7 @@ func NewRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fibe
 			return c.Status(fiber.StatusNotImplemented).SendString("SingleRepo is disabled")
 		}
 
-		result, err := mixer.MixRepo(cfg, sourceManager)
+		result, err := mixer.MixTvBoxRepo(cfg, sourceManager)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
@@ -96,4 +98,35 @@ func NewSpiderHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fi
 	}
 
 	return handler
+}
+
+func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if cfg.EPGOpt.Disable {
+			return c.Status(fiber.StatusNotImplemented).SendString("EPG is disabled")
+		}
+
+		result, err := mixer.MixEPG(cfg, sourceManager)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		}
+
+		// Set appropriate headers
+		c.Set("Content-Type", "application/xml")
+		c.Set("Content-Encoding", "gzip")
+
+		// Create a gzip writer
+		gzipWriter := gzip.NewWriter(c.Response().BodyWriter())
+		defer gzipWriter.Close()
+
+		// Create an XML encoder that writes directly to the gzip writer
+		encoder := xml.NewEncoder(gzipWriter)
+
+		// Encode result directly to the gzip writer
+		if err := encoder.Encode(result); err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString("Error encoding and compressing XML")
+		}
+
+		return nil
+	}
 }

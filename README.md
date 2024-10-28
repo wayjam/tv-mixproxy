@@ -45,7 +45,6 @@ external_url: "http://example.com"  # 外部访问地址
 log:
   output: "stdout"  # 日志输出位置，stdout表示标准输出
   level: 2  # 日志级别，2表示Info级别
-
 sources:
   - name: "main_source"  # 源名称
     url: "https://example.com/main_source.json"  # 源地址
@@ -62,15 +61,10 @@ sources:
     url: "file:///app/multi.json"  # 本地文件源
     type: "tvbox_multi"  # 多仓源
     interval: 7200
-
 single_repo_opt: # 单仓配置
   disable: false  # 是否禁用单仓配置
   spider:
     source_name: "main_source"  # 使用main_source的spider配置
-  wallpaper:
-    source_name: "main_source"  # 使用main_source的wallpaper配置
-  logo:
-    source_name: "main_source"  # 使用main_source的logo配置
   sites:
     disabled: false  # 是否禁用doh配置
     source_name: "main_source"  # 使用main_source的sites配置
@@ -81,7 +75,6 @@ single_repo_opt: # 单仓配置
     source_name: "main_source"  # 使用main_source的doh配置
   fallback:
     source_name: "bar_source"  # 使用bar_source的fallback配置
-
 multi_repo_opt:
   disable: false  # 是否禁用多仓配置
   include_single_repo: true  # 是否包含单仓配置
@@ -91,6 +84,10 @@ multi_repo_opt:
     filter_by: "name"  # 按name进行过滤
     include: ".*"  # 包含所有仓库
     exclude: "^test_"  # 排除以test_开头的仓库
+epg_opt:
+  filters:
+    - source_name: "main_source"  # 使用main_source的channel_filter配置
+      filter_by: "channel_id"  # 按channel_id/program_title进行过滤
 ```
 
 ## 许可证
