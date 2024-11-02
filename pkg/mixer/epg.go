@@ -5,17 +5,18 @@ import (
 	"fmt"
 
 	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/epg"
 )
 
 func MixEPG(
 	cfg *config.Config, sourcer Sourcer,
-) (*config.EPG, error) {
+) (*epg.EPG, error) {
 	if cfg.EPGOpt.Disable {
-		return &config.EPG{}, nil
+		return &epg.EPG{}, nil
 	}
 
-	mixedEPG := &config.EPG{}
-	channelMap := make(map[string]config.EPGChannel) // 用于追踪已添加的频道
+	mixedEPG := &epg.EPG{}
+	channelMap := make(map[string]epg.EPGChannel) // 用于追踪已添加的频道
 
 	for _, filter := range cfg.EPGOpt.Filters {
 		source, err := sourcer.GetSource(filter.SourceName)
@@ -33,7 +34,7 @@ func MixEPG(
 		}
 
 		// 创建频道ID到频道的映射，用于快速查找
-		sourceChannelMap := make(map[string]config.EPGChannel)
+		sourceChannelMap := make(map[string]epg.EPGChannel)
 		for _, channel := range sourceEpg.Channel {
 			sourceChannelMap[channel.ID] = channel
 		}
@@ -67,8 +68,8 @@ func MixEPG(
 	return mixedEPG, nil
 }
 
-func filterChannels(channels []config.EPGChannel, filter config.ArrayMixOpt) []config.EPGChannel {
-	var filtered []config.EPGChannel
+func filterChannels(channels []epg.EPGChannel, filter config.ArrayMixOpt) []epg.EPGChannel {
+	var filtered []epg.EPGChannel
 	includeRegex := compileRegex(filter.Include)
 	excludeRegex := compileRegex(filter.Exclude)
 
@@ -83,8 +84,8 @@ func filterChannels(channels []config.EPGChannel, filter config.ArrayMixOpt) []c
 	return filtered
 }
 
-func filterProgrammes(programmes []config.EPGProgramme, filter config.ArrayMixOpt) []config.EPGProgramme {
-	var filtered []config.EPGProgramme
+func filterProgrammes(programmes []epg.EPGProgramme, filter config.ArrayMixOpt) []epg.EPGProgramme {
+	var filtered []epg.EPGProgramme
 	includeRegex := compileRegex(filter.Include)
 	excludeRegex := compileRegex(filter.Exclude)
 

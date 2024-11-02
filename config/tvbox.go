@@ -5,11 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"os"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
 // FlexInt 是一个灵活的整数类型，可以从 JSON 中的数字或字符串解析
@@ -111,35 +108,9 @@ type TvBoxRule struct {
 }
 
 func LoadTvBoxData(uri string) ([]byte, error) {
-	var data []byte
-	var err error
-
-	if strings.HasPrefix(uri, "file://") {
-		// Load from local file
-		data, err = os.ReadFile(strings.TrimPrefix(uri, "file://"))
-	} else if strings.HasPrefix(uri, "http://") || strings.HasPrefix(uri, "https://") {
-		// Load from network URL
-		resp, err := http.Get(uri)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch data from URL: %v", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode >= http.StatusBadRequest {
-			return nil, fmt.Errorf("failed to fetch data from URL: %s", resp.Status)
-		}
-
-		data, err = io.ReadAll(resp.Body)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to read data: %v", err)
-		}
-	} else {
-		return nil, fmt.Errorf("unsupported URI scheme: %s", uri)
-	}
-
+	data, err := FetchData(uri)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read data: %v", err)
+		return nil, err
 	}
 
 	// Remove comments from JSON

@@ -2,6 +2,8 @@ module github.com/wayjam/tv-mixproxy
 
 go 1.22.3
 
+replace github.com/jamesnetherton/m3u => github.com/wayjam/m3u v0.0.0-20241029160035-d1ef859bcb0c
+
 require (
 	github.com/gofiber/fiber/v3 v3.0.0-beta.3
 	github.com/spf13/cobra v1.8.1
@@ -17,7 +19,6 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gofiber/utils/v2 v2.0.0-beta.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/grafov/m3u8 v0.12.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect

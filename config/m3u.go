@@ -2,26 +2,21 @@ package config
 
 import (
 	"io"
-	"net/http"
 
-	"github.com/grafov/m3u8"
+	"github.com/wayjam/tv-mixproxy/pkg/m3u"
 )
 
-func LoadM3U8Data(uri string) ([]byte, error) {
-	resp, err := http.Get(uri)
+func ParseM3U8Config(r io.Reader) (m3u.Playlist, error) {
+	var playlist m3u.Playlist
+	data, err := io.ReadAll(r)
 	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return io.ReadAll(resp.Body)
-}
-
-func ParseM3U8Config(r io.Reader) (m3u8.Playlist, m3u8.ListType, error) {
-	p, listType, err := m3u8.DecodeFrom(r, true)
-	if err != nil {
-		return nil, 0, err
+		return playlist, err
 	}
 
-	return p, listType, nil
+	err = m3u.Unmarshal(data, &playlist)
+	if err != nil {
+		return playlist, err
+	}
+
+	return playlist, nil
 }

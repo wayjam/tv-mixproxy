@@ -1,0 +1,33 @@
+#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:11
+#EXTINF:10.000000,
+http://example.com/stream1.ts
+#EXTINF:10.000000,
+http://example.com/stream2.ts
+#EXTINF:10.000000,
+http://example.com/stream3.ts
+#EXTINF:10.000000,
+http://example.com/stream4.ts
+#EXTINF:10.000000,
+http://example.com/stream5.ts
+#EXTINF:10.000000,
+http://example.com/stream6.ts
+#EXTINF:10.000000,
+http://example.com/stream7.ts
+#EXTINF:10.000000,
+http://example.com/stream8.ts
+#EXTINF:10.000000,
+http://example.com/stream9.ts
+#EXTINF:10.000000,
+http://example.com/stream10.ts
+#EXTINF:10.000000,
+http://example.com/stream11.ts
+#EXT-X-ENDLIST
+
+#EXTINF:10.000000,TVG-ID="Channel1" tvg-name="Channel 1" tvg-logo="http://example.com/channel1.png" group-title="Entertainment",Channel 1
+http://example.com/stream1.ts
+
+#EXTINF:10.000000,TVG-ID="Channel2" tvg-name="Channel 2" tvg-logo="http://example.com/channel2.png" group-title="Entertainment",Channel 2
+http://example.com/stream2.ts

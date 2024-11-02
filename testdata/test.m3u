@@ -1,0 +1,13 @@
+#EXTM3U x-tvg-url="https://stub.example.com/epg1.xml.gz,https://stub.example.com/epg2.xml"
+#EXTINF:-1 tvg-name="CCTV1" tvg-logo="https://stub.example.com/logos/CCTV1.png" group-title="•央视「IPV6」",CCTV1「IPV6」
+https://stub.example.com/live/cctv1.m3u8
+#EXTINF:-1 tvg-name="CCTV2" tvg-logo="https://stub.example.com/logos/CCTV2.png" group-title="•央视「IPV6」",CCTV2「IPV6」
+https://stub.example.com/live/cctv2.m3u8
+#EXTINF:-1 tvg-name="CCTV3" tvg-logo="https://stub.example.com/logos/CCTV3.png" group-title="•央视「IPV6」",CCTV3「IPV6」
+https://stub.example.com/live/cctv3.m3u8
+#EXTINF:-1 tvg-name="CCTV4" tvg-logo="https://stub.example.com/logos/CCTV4.png" group-title="•央视「IPV6」",CCTV4「IPV6」
+https://stub.example.com/live/cctv4.m3u8
+#EXTINF:-1 tvg-name="CCTV5" tvg-logo="https://stub.example.com/logos/CCTV5.png" group-title="•央视「IPV6」",CCTV5「IPV6」
+https://stub.example.com/live/cctv5.m3u8
+#EXTINF:-1 tvg-name="CCTV5+" tvg-logo="https://stub.example.com/logos/CCTV5+.png" group-title="•央视「IPV6」",CCTV5+「IPV6」
+https://stub.example.com/live/cctv5plus.m3u8

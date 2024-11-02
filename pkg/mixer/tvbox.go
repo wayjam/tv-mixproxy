@@ -65,7 +65,7 @@ func MixTvBoxRepo(
 	result := &config.TvBoxRepoConfig{
 		Wallpaper: getExternalURL(cfg) + "/wallpaper?bg_color=333333&border_width=5&border_color=666666",
 		Logo:      getExternalURL(cfg) + "/logo",
-		Spider:    getExternalURL(cfg) + "/v1/tvbox_spider",
+		Spider:    getExternalURL(cfg) + "/v1/tvbox/spider",
 	}
 	singleRepoOpt := cfg.TvBoxSingleRepoOpt
 

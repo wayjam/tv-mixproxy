@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/epg"
 )
 
 // MockEPGSourcer 是一个用于测试的 Sourcer 实现
@@ -54,7 +55,7 @@ func TestMixEPG(t *testing.T) {
 		config         *config.Config
 		expectedCount  int
 		expectedError  bool
-		checkFunction  func(*config.EPG) bool
+		checkFunction  func(*epg.EPG) bool
 		expectedSource string
 	}{
 		{
@@ -74,7 +75,7 @@ func TestMixEPG(t *testing.T) {
 				},
 			},
 			expectedCount: 1,
-			checkFunction: func(epg *config.EPG) bool {
+			checkFunction: func(epg *epg.EPG) bool {
 				return len(epg.Channel) == 1 && epg.Channel[0].ID == "channel1" &&
 					len(epg.Programme) == 1 && epg.Programme[0].Channel == "channel1"
 			},
@@ -96,7 +97,7 @@ func TestMixEPG(t *testing.T) {
 				},
 			},
 			expectedCount: 1,
-			checkFunction: func(epg *config.EPG) bool {
+			checkFunction: func(epg *epg.EPG) bool {
 				return len(epg.Channel) == 1 && epg.Channel[0].ID == "channel3" &&
 					len(epg.Programme) == 1 && epg.Programme[0].Title.Text == "Special Show"
 			},
@@ -109,7 +110,7 @@ func TestMixEPG(t *testing.T) {
 				},
 			},
 			expectedCount: 0,
-			checkFunction: func(epg *config.EPG) bool {
+			checkFunction: func(epg *epg.EPG) bool {
 				return len(epg.Channel) == 0 && len(epg.Programme) == 0
 			},
 		},
@@ -154,7 +155,7 @@ func TestMixEPG(t *testing.T) {
 				},
 			},
 			expectedCount: 2,
-			checkFunction: func(epg *config.EPG) bool {
+			checkFunction: func(epg *epg.EPG) bool {
 				return len(epg.Channel) == 2 &&
 					len(epg.Programme) == 2
 			},
@@ -200,7 +201,7 @@ func TestMixEPG(t *testing.T) {
 }
 
 func TestFilterChannels(t *testing.T) {
-	channels := []config.EPGChannel{
+	channels := []epg.EPGChannel{
 		{ID: "channel1"},
 		{ID: "channel2"},
 		{ID: "channel3"},
@@ -257,17 +258,17 @@ func TestFilterChannels(t *testing.T) {
 }
 
 func TestFilterProgrammes(t *testing.T) {
-	programmes := []config.EPGProgramme{
-		{Channel: "channel1", Title: config.EPGTxt{Text: "Show A"}},
-		{Channel: "channel2", Title: config.EPGTxt{Text: "Show B"}},
-		{Channel: "channel3", Title: config.EPGTxt{Text: "Special Show"}},
+	programmes := []epg.EPGProgramme{
+		{Channel: "channel1", Title: epg.EPGTxt{Text: "Show A"}},
+		{Channel: "channel2", Title: epg.EPGTxt{Text: "Show B"}},
+		{Channel: "channel3", Title: epg.EPGTxt{Text: "Special Show"}},
 	}
 
 	tests := []struct {
 		name          string
 		filter        config.ArrayMixOpt
 		expectedCount int
-		checkFunction func([]config.EPGProgramme) bool
+		checkFunction func([]epg.EPGProgramme) bool
 	}{
 		{
 			name: "Filter by channel ID",
@@ -276,7 +277,7 @@ func TestFilterProgrammes(t *testing.T) {
 				Include:  "channel[12]",
 			},
 			expectedCount: 2,
-			checkFunction: func(result []config.EPGProgramme) bool {
+			checkFunction: func(result []epg.EPGProgramme) bool {
 				return result[0].Channel == "channel1" && result[1].Channel == "channel2"
 			},
 		},
@@ -287,7 +288,7 @@ func TestFilterProgrammes(t *testing.T) {
 				Include:  "Special",
 			},
 			expectedCount: 1,
-			checkFunction: func(result []config.EPGProgramme) bool {
+			checkFunction: func(result []epg.EPGProgramme) bool {
 				return result[0].Title.Text == "Special Show"
 			},
 		},

@@ -28,11 +28,13 @@ ghcr.io/tv-mixproxy/tv-mixproxy:latest
 
 ## 接口说明
 
-1. `/logo`: 获取 Logo 图片
-2. `/wallpaper`: 获取壁纸图片
-3. `/v1/tvbox_spider`: 代理单仓的 spider 配置
-4. `/v1/tvbox_repo`: 获取混合后的单仓配置
-5. `/v1/tvbox_multi_repo`: 获取混合后的多仓配置
+- `/logo`: 获取 Logo 图片
+- `/wallpaper`: 获取壁纸图片
+- `/v1/tvbox/spider`: 代理单仓的 spider 配置
+- `/v1/tvbox/repo`: 获取混合后的单仓配置
+- `/v1/tvbox/multi_repo`: 获取混合后的多仓配置
+- `/v1/epg`: 获取混合后的EPG列表
+- `/v1/m3u/media_playlist`: 获取混合后的 m3u 媒体播放列表
 
 ## 配置说明
 
@@ -88,6 +90,9 @@ epg_opt:
   filters:
     - source_name: "main_source"  # 使用main_source的channel_filter配置
       filter_by: "channel_id"  # 按channel_id/program_title进行过滤
+m3u_opt:
+  filters:
+    - source_name: "main_source"  # 使用main_source的channel_filter配置
 ```
 
 ## 许可证

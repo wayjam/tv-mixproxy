@@ -82,7 +82,7 @@ func TestMixRepo_FieldNotExist(t *testing.T) {
 
 	result, err := MixTvBoxRepo(cfg, mockSourcer)
 	assert.NoError(t, err)
-	assert.Equal(t, "http://localhost:0/v1/tvbox_spider", result.Spider)
+	assert.Equal(t, "http://localhost:0/v1/tvbox/spider", result.Spider)
 	assert.Contains(t, result.Wallpaper, "localhost")
 	assert.Contains(t, result.Logo, "localhost")
 	assert.Empty(t, result.Sites)

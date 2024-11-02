@@ -17,7 +17,7 @@ func TestNewSourceManager(t *testing.T) {
 		{Name: "test2", URL: "http://example.com/test2", Type: config.SourceTypeTvBoxMulti, Interval: 120},
 	}
 
-	sm := NewSourceManager(sources)
+	sm := NewSourceManager(sources, nil)
 
 	assert.NotNil(t, sm)
 	assert.Len(t, sm.sources, 2)
@@ -40,7 +40,7 @@ func TestGetSource(t *testing.T) {
 		{Name: "test", URL: server.URL, Type: config.SourceTypeTvBoxSingle, Interval: 60},
 	}
 
-	sm := NewSourceManager(sources)
+	sm := NewSourceManager(sources, nil)
 
 	// First call should trigger a refresh
 	data, err := sm.GetSource("test")
@@ -80,7 +80,7 @@ func TestRefreshSource(t *testing.T) {
 		{Name: "test", URL: server.URL, Type: config.SourceTypeTvBoxSingle, Interval: 1}, // 1 second interval
 	}
 
-	sm := NewSourceManager(sources)
+	sm := NewSourceManager(sources, nil)
 
 	// First call
 	_, err := sm.GetSource("test")

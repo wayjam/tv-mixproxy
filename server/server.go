@@ -27,7 +27,9 @@ func NewServer(cfg *config.Config) *server {
 		AppName: "TV MixProxy",
 	})
 
-	app.Use(recoverer.New())
+	app.Use(recoverer.New(recoverer.Config{
+		EnableStackTrace: true,
+	}))
 	app.Use(requestid.New())
 
 	// Configure logging middleware
@@ -54,7 +56,7 @@ func NewServer(cfg *config.Config) *server {
 		TimeZone:   "Local",
 	}))
 
-	sourceManager := mixer.NewSourceManager(cfg.Sources)
+	sourceManager := mixer.NewSourceManager(cfg.Sources, fiberlog.DefaultLogger())
 
 	return &server{
 		app:           app,
@@ -69,10 +71,11 @@ func (s *server) SetupRoutes(app *fiber.App) {
 	app.Get("/wallpaper", Wallpaper)
 
 	v1 := app.Group("/v1")
-	v1.Get("/tvbox_repo", NewRepoHandler(s.cfg, s.sourceManager))
-	v1.Get("/tvbox_multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager))
-	v1.Get("/tvbox_spider", NewSpiderHandler(s.cfg, s.sourceManager))
+	v1.Get("/tvbox/repo", NewRepoHandler(s.cfg, s.sourceManager))
+	v1.Get("/tvbox/multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager))
+	v1.Get("/tvbox/spider", NewSpiderHandler(s.cfg, s.sourceManager))
 	v1.Get("/epg", NewEPGHandler(s.cfg, s.sourceManager))
+	v1.Get("/m3u/media_playlist", NewM3UMediaHandler(s.cfg, s.sourceManager))
 }
 
 func (s *server) Run() error {
@@ -93,6 +96,8 @@ func (s *server) Run() error {
 	}
 
 	s.SetupRoutes(s.app)
+
+	s.sourceManager.TriggerRefresh()
 
 	return s.app.Listen(fmt.Sprintf(":%d", s.cfg.ServerPort))
 }

@@ -14,6 +14,7 @@ type Config struct {
 	TvBoxSingleRepoOpt TvBoxSingleRepoOpt `mapstructure:"tvbox_single_repo_opt"` // TvBox单仓源配置
 	TvBoxMultiRepoOpt  TvBoxMultiRepoOpt  `mapstructure:"tvbox_multi_repo_opt"`  // TvBox多仓源配置
 	EPGOpt             EPGOpt             `mapstructure:"epg"`                   // EPG源配置
+	M3UOpt             M3UOpt             `mapstructure:"m3u"`                   // M3U源配置
 }
 
 func (c *Config) Fixture() {
@@ -44,6 +45,13 @@ func (c *Config) Fixture() {
 		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Flags.MixOpt)
 		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Rules.MixOpt)
 		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Ads.MixOpt)
+	}
+
+	// Set default interval for sources
+	for i := range c.Sources {
+		if c.Sources[i].Interval == 0 {
+			c.Sources[i].Interval = 60
+		}
 	}
 }
 
@@ -94,6 +102,13 @@ type EPGOpt struct {
 	Filters []ArrayMixOpt `mapstructure:"filters"`
 }
 
+type M3UOpt struct {
+	Disable               bool          `mapstructure:"disable"`                 // 是否禁用M3U源
+	MediaPlaylistFallback MixOpt        `mapstructure:"media_playlist_fallback"` // 媒体播放列表降级配置
+	MediaPlaylistFilters  []ArrayMixOpt `mapstructure:"media_playlist_filters"`  // 媒体播放列表过滤配置
+	// MasterPlaylistFilters []ArrayMixOpt `mapstructure:"master_playlist_filters"` // 主播放列表过滤配置
+}
+
 type MixOpt struct {
 	SourceName string `mapstructure:"source_name"`
 	Field      string `mapstructure:"field"`    // 内部使用，无需配置
@@ -111,7 +126,7 @@ type Source struct {
 	Name     string     `mapstructure:"name"`     // 源名称, 唯一标识， 用来标识用在配置中
 	URL      string     `mapstructure:"url"`      // 源地址
 	Type     SourceType `mapstructure:"type"`     // 源类型
-	Interval int        `mapstructure:"interval"` // 源更新频率，单位为秒
+	Interval int        `mapstructure:"interval"` // 源更新频率，单位为秒, 默认 60 秒
 }
 
 type SourceType string
@@ -120,7 +135,7 @@ const (
 	SourceTypeTvBoxSingle SourceType = "tvbox_single" // tvbox单仓源
 	SourceTypeTvBoxMulti  SourceType = "tvbox_multi"  // tvbox多仓源
 	SourceTypeEPG         SourceType = "epg"          // epg源
-	SourceTypeM3U8        SourceType = "m3u8"         // m3u8源
+	SourceTypeM3U         SourceType = "m3u"          // m3u源
 )
 
 func LoadServerConfig(cfgFile string) (*Config, error) {

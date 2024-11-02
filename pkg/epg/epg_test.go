@@ -1,9 +1,6 @@
-package config
+package epg
 
 import (
-	"bytes"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -20,28 +17,10 @@ const epgData = `
 </tv>
 `
 
-func TestLoadEPGData(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("<tv></tv>"))
-	}))
-	defer server.Close()
-
-	data, err := LoadEPGData(server.URL)
+func TestUnmarshal(t *testing.T) {
+	epg, err := Unmarshal([]byte(epgData))
 	if err != nil {
-		t.Fatalf("LoadEPGData failed: %v", err)
-	}
-
-	if string(data) != "<tv></tv>" {
-		t.Errorf("Unexpected data: %s", string(data))
-	}
-}
-
-func TestParseEPGConfig(t *testing.T) {
-	reader := bytes.NewReader([]byte(epgData))
-	epg, err := ParseEPGConfig(reader)
-	if err != nil {
-		t.Fatalf("ParseEPGConfig failed: %v", err)
+		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
 	if len(epg.Channel) != 1 {

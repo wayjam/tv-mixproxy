@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	fiberlog "github.com/gofiber/fiber/v3/log"
+
 	"github.com/wayjam/tv-mixproxy/config"
 )
 
@@ -30,6 +32,8 @@ type SourceManager struct {
 	mu      sync.RWMutex
 	ticker  *time.Ticker
 	done    chan bool
+	refresh chan bool
+	logger  fiberlog.CommonLogger
 }
 
 type Source struct {
@@ -60,11 +64,13 @@ func (s *Source) GetSource(_ string) ([]byte, error) {
 	return s.data, nil
 }
 
-func NewSourceManager(sources []config.Source) *SourceManager {
+func NewSourceManager(sources []config.Source, logger fiberlog.CommonLogger) *SourceManager {
 	sm := &SourceManager{
 		sources: make(map[string]*Source),
 		ticker:  time.NewTicker(1 * time.Minute), // 每分钟检查一次
 		done:    make(chan bool),
+		refresh: make(chan bool),
+		logger:  logger,
 	}
 
 	for _, s := range sources {
@@ -82,6 +88,8 @@ func (sm *SourceManager) refreshLoop() {
 	for {
 		select {
 		case <-sm.ticker.C:
+			sm.refreshExpiredSources()
+		case <-sm.refresh:
 			sm.refreshExpiredSources()
 		case <-sm.done:
 			sm.ticker.Stop()
@@ -140,15 +148,22 @@ func (sm *SourceManager) refreshSource(name string) error {
 
 	var data []byte
 	var err error
+
+	defer func() {
+		if sm.logger != nil {
+			sm.logger.Infow("refresh source", "name", name, "error", err)
+		}
+	}()
+
 	switch source.Type() {
 	case config.SourceTypeTvBoxSingle:
 		data, err = config.LoadTvBoxData(source.config.URL)
 	case config.SourceTypeTvBoxMulti:
 		data, err = config.LoadTvBoxData(source.config.URL)
 	case config.SourceTypeEPG:
-		data, err = config.LoadEPGData(source.config.URL)
-	case config.SourceTypeM3U8:
-		data, err = config.LoadM3U8Data(source.config.URL)
+		data, err = config.FetchData(source.config.URL)
+	case config.SourceTypeM3U:
+		data, err = config.FetchData(source.config.URL)
 	}
 
 	sm.mu.Lock()
@@ -169,4 +184,8 @@ func (sm *SourceManager) refreshSource(name string) error {
 
 func (sm *SourceManager) Close() {
 	sm.done <- true
+}
+
+func (sm *SourceManager) TriggerRefresh() {
+	sm.refresh <- true
 }

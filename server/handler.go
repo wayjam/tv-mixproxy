@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/wayjam/tv-mixproxy/config"
 	"github.com/wayjam/tv-mixproxy/pkg/imageutil"
+	"github.com/wayjam/tv-mixproxy/pkg/m3u"
 	"github.com/wayjam/tv-mixproxy/pkg/mixer"
 )
 
@@ -125,6 +126,26 @@ func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber
 		// Encode result directly to the gzip writer
 		if err := encoder.Encode(result); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString("Error encoding and compressing XML")
+		}
+
+		return nil
+	}
+}
+
+func NewM3UMediaHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if cfg.M3UOpt.Disable {
+			return c.Status(fiber.StatusNotImplemented).SendString("M3U is disabled")
+		}
+
+		result, err := mixer.MixM3UMediaPlayList(cfg, sourceManager)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		}
+
+		encoder := m3u.NewEncoder(c.Response().BodyWriter())
+		if err := encoder.Encode(result); err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 
 		return nil
