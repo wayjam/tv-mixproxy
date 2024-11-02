@@ -88,9 +88,9 @@ func (sm *SourceManager) refreshLoop() {
 	for {
 		select {
 		case <-sm.ticker.C:
-			sm.refreshExpiredSources()
+			sm.refreshExpiredSources(false)
 		case <-sm.refresh:
-			sm.refreshExpiredSources()
+			sm.refreshExpiredSources(true)
 		case <-sm.done:
 			sm.ticker.Stop()
 			return
@@ -98,12 +98,14 @@ func (sm *SourceManager) refreshLoop() {
 	}
 }
 
-func (sm *SourceManager) refreshExpiredSources() {
+func (sm *SourceManager) refreshExpiredSources(force bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
 	for name, source := range sm.sources {
-		if time.Since(source.lastUpdate) > time.Duration(source.config.Interval)*time.Second {
+		if force ||
+			(source.config.Interval != -1 &&
+				time.Since(source.lastUpdate) > time.Duration(source.config.Interval)*time.Second) {
 			go sm.refreshSource(name) // 异步刷新，避免阻塞
 		}
 	}
@@ -118,7 +120,8 @@ func (sm *SourceManager) GetSource(name string) (*Source, error) {
 		return nil, fmt.Errorf("source not found: %s", name)
 	}
 
-	if time.Since(source.lastUpdate) > time.Duration(source.config.Interval)*time.Second || source.data == nil {
+	if source.config.Interval != -1 &&
+		(time.Since(source.lastUpdate) > time.Duration(source.config.Interval)*time.Second || source.data == nil) {
 		if err := sm.refreshSource(name); err != nil {
 			return nil, err
 		}
