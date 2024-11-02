@@ -201,7 +201,7 @@ func TestMixEPG(t *testing.T) {
 }
 
 func TestFilterChannels(t *testing.T) {
-	channels := []epg.EPGChannel{
+	channels := []epg.Channel{
 		{ID: "channel1"},
 		{ID: "channel2"},
 		{ID: "channel3"},
@@ -258,17 +258,17 @@ func TestFilterChannels(t *testing.T) {
 }
 
 func TestFilterProgrammes(t *testing.T) {
-	programmes := []epg.EPGProgramme{
-		{Channel: "channel1", Title: epg.EPGTxt{Text: "Show A"}},
-		{Channel: "channel2", Title: epg.EPGTxt{Text: "Show B"}},
-		{Channel: "channel3", Title: epg.EPGTxt{Text: "Special Show"}},
+	programmes := []epg.Programme{
+		{Channel: "channel1", Title: epg.Txt{Text: "Show A"}},
+		{Channel: "channel2", Title: epg.Txt{Text: "Show B"}},
+		{Channel: "channel3", Title: epg.Txt{Text: "Special Show"}},
 	}
 
 	tests := []struct {
 		name          string
 		filter        config.ArrayMixOpt
 		expectedCount int
-		checkFunction func([]epg.EPGProgramme) bool
+		checkFunction func([]epg.Programme) bool
 	}{
 		{
 			name: "Filter by channel ID",
@@ -277,7 +277,7 @@ func TestFilterProgrammes(t *testing.T) {
 				Include:  "channel[12]",
 			},
 			expectedCount: 2,
-			checkFunction: func(result []epg.EPGProgramme) bool {
+			checkFunction: func(result []epg.Programme) bool {
 				return result[0].Channel == "channel1" && result[1].Channel == "channel2"
 			},
 		},
@@ -288,7 +288,7 @@ func TestFilterProgrammes(t *testing.T) {
 				Include:  "Special",
 			},
 			expectedCount: 1,
-			checkFunction: func(result []epg.EPGProgramme) bool {
+			checkFunction: func(result []epg.Programme) bool {
 				return result[0].Title.Text == "Special Show"
 			},
 		},

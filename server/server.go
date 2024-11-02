@@ -74,7 +74,7 @@ func (s *server) SetupRoutes(app *fiber.App) {
 	v1.Get("/tvbox/repo", NewRepoHandler(s.cfg, s.sourceManager))
 	v1.Get("/tvbox/multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager))
 	v1.Get("/tvbox/spider", NewSpiderHandler(s.cfg, s.sourceManager))
-	v1.Get("/epg", NewEPGHandler(s.cfg, s.sourceManager))
+	v1.Get("/epg.xml", NewEPGHandler(s.cfg, s.sourceManager))
 	v1.Get("/m3u/media_playlist", NewM3UMediaHandler(s.cfg, s.sourceManager))
 }
 

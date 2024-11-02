@@ -16,7 +16,7 @@ func MixEPG(
 	}
 
 	mixedEPG := &epg.EPG{}
-	channelMap := make(map[string]epg.EPGChannel) // 用于追踪已添加的频道
+	channelMap := make(map[string]epg.Channel) // 用于追踪已添加的频道
 
 	for _, filter := range cfg.EPGOpt.Filters {
 		source, err := sourcer.GetSource(filter.SourceName)
@@ -34,7 +34,7 @@ func MixEPG(
 		}
 
 		// 创建频道ID到频道的映射，用于快速查找
-		sourceChannelMap := make(map[string]epg.EPGChannel)
+		sourceChannelMap := make(map[string]epg.Channel)
 		for _, channel := range sourceEpg.Channel {
 			sourceChannelMap[channel.ID] = channel
 		}
@@ -68,8 +68,8 @@ func MixEPG(
 	return mixedEPG, nil
 }
 
-func filterChannels(channels []epg.EPGChannel, filter config.ArrayMixOpt) []epg.EPGChannel {
-	var filtered []epg.EPGChannel
+func filterChannels(channels []epg.Channel, filter config.ArrayMixOpt) []epg.Channel {
+	var filtered []epg.Channel
 	includeRegex := compileRegex(filter.Include)
 	excludeRegex := compileRegex(filter.Exclude)
 
@@ -84,8 +84,8 @@ func filterChannels(channels []epg.EPGChannel, filter config.ArrayMixOpt) []epg.
 	return filtered
 }
 
-func filterProgrammes(programmes []epg.EPGProgramme, filter config.ArrayMixOpt) []epg.EPGProgramme {
-	var filtered []epg.EPGProgramme
+func filterProgrammes(programmes []epg.Programme, filter config.ArrayMixOpt) []epg.Programme {
+	var filtered []epg.Programme
 	includeRegex := compileRegex(filter.Include)
 	excludeRegex := compileRegex(filter.Exclude)
 

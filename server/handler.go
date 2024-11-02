@@ -112,9 +112,15 @@ func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 
+		format := c.Query("format", "xml")
+
 		// Set appropriate headers
 		c.Set("Content-Type", "application/xml")
 		c.Set("Content-Encoding", "gzip")
+
+		if format == "gz" {
+			c.Set("Content-Disposition", "attachment; filename=epg.xml.gz")
+		}
 
 		// Create a gzip writer
 		gzipWriter := gzip.NewWriter(c.Response().BodyWriter())
