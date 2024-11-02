@@ -39,9 +39,13 @@ func TestMixRepo(t *testing.T) {
 			Spider:    config.MixOpt{SourceName: "source1", Field: "spider"},
 			Wallpaper: config.MixOpt{SourceName: "source2", Field: "wallpaper"},
 			Logo:      config.MixOpt{}, // Empty source, should not be mixed
-			Sites:     config.ArrayMixOpt{MixOpt: config.MixOpt{SourceName: "source1", Field: "sites"}},
-			DOH:       config.ArrayMixOpt{MixOpt: config.MixOpt{}}, // Empty source, should not be mixed
-			Lives:     config.ArrayMixOpt{MixOpt: config.MixOpt{SourceName: "source1", Field: "lives"}},
+			Sites: []config.ArrayMixOpt{{
+				MixOpt: config.MixOpt{SourceName: "source1", Field: "sites"},
+			}},
+			DOH: []config.ArrayMixOpt{}, // Empty source, should not be mixed
+			Lives: []config.ArrayMixOpt{{
+				MixOpt: config.MixOpt{SourceName: "source1", Field: "lives"},
+			}},
 		},
 	}
 
@@ -74,9 +78,15 @@ func TestMixRepo_FieldNotExist(t *testing.T) {
 			Spider:    config.MixOpt{SourceName: "source1", Field: "non_existent_spider"},
 			Wallpaper: config.MixOpt{SourceName: "source2", Field: "non_existent_wallpaper"},
 			Logo:      config.MixOpt{SourceName: "source1", Field: "non_existent_logo"},
-			Sites:     config.ArrayMixOpt{MixOpt: config.MixOpt{SourceName: "source1", Field: "non_existent_sites"}},
-			DOH:       config.ArrayMixOpt{MixOpt: config.MixOpt{SourceName: "source2", Field: "non_existent_doh"}},
-			Lives:     config.ArrayMixOpt{MixOpt: config.MixOpt{SourceName: "source1", Field: "non_existent_lives"}},
+			Sites: []config.ArrayMixOpt{{
+				MixOpt: config.MixOpt{SourceName: "source1", Field: "non_existent_sites"},
+			}},
+			DOH: []config.ArrayMixOpt{{
+				MixOpt: config.MixOpt{SourceName: "source2", Field: "non_existent_doh"},
+			}},
+			Lives: []config.ArrayMixOpt{{
+				MixOpt: config.MixOpt{SourceName: "source1", Field: "non_existent_lives"},
+			}},
 		},
 	}
 

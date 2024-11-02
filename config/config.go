@@ -21,14 +21,27 @@ func (c *Config) Fixture() {
 	c.TvBoxSingleRepoOpt.Spider.Field = "spider"
 	c.TvBoxSingleRepoOpt.Wallpaper.Field = "wallpaper"
 	c.TvBoxSingleRepoOpt.Logo.Field = "logo"
-	c.TvBoxSingleRepoOpt.Sites.Field = "sites"
-	c.TvBoxSingleRepoOpt.DOH.Field = "doh"
-	c.TvBoxSingleRepoOpt.Lives.Field = "lives"
-	c.TvBoxSingleRepoOpt.Parses.Field = "parses"
-	c.TvBoxSingleRepoOpt.Flags.Field = "flags"
-	c.TvBoxSingleRepoOpt.Rules.Field = "rules"
-	c.TvBoxSingleRepoOpt.Ads.Field = "ads"
-
+	for i := range c.TvBoxSingleRepoOpt.Sites {
+		c.TvBoxSingleRepoOpt.Sites[i].Field = "sites"
+	}
+	for i := range c.TvBoxSingleRepoOpt.DOH {
+		c.TvBoxSingleRepoOpt.DOH[i].Field = "doh"
+	}
+	for i := range c.TvBoxSingleRepoOpt.Lives {
+		c.TvBoxSingleRepoOpt.Lives[i].Field = "lives"
+	}
+	for i := range c.TvBoxSingleRepoOpt.Parses {
+		c.TvBoxSingleRepoOpt.Parses[i].Field = "parses"
+	}
+	for i := range c.TvBoxSingleRepoOpt.Flags {
+		c.TvBoxSingleRepoOpt.Flags[i].Field = "flags"
+	}
+	for i := range c.TvBoxSingleRepoOpt.Rules {
+		c.TvBoxSingleRepoOpt.Rules[i].Field = "rules"
+	}
+	for i := range c.TvBoxSingleRepoOpt.Ads {
+		c.TvBoxSingleRepoOpt.Ads[i].Field = "ads"
+	}
 	for i := range c.TvBoxMultiRepoOpt.Repos {
 		c.TvBoxMultiRepoOpt.Repos[i].Field = "urls"
 		c.TvBoxMultiRepoOpt.Repos[i].FilterBy = "name"
@@ -38,13 +51,13 @@ func (c *Config) Fixture() {
 		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Spider)
 		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Wallpaper)
 		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Logo)
-		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Sites.MixOpt)
-		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.DOH.MixOpt)
-		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Lives.MixOpt)
-		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Parses.MixOpt)
-		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Flags.MixOpt)
-		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Rules.MixOpt)
-		c.fillFallbackSourceName(&c.TvBoxSingleRepoOpt.Ads.MixOpt)
+		c.fillFallbackSourceNameForArray(c.TvBoxSingleRepoOpt.Sites)
+		c.fillFallbackSourceNameForArray(c.TvBoxSingleRepoOpt.DOH)
+		c.fillFallbackSourceNameForArray(c.TvBoxSingleRepoOpt.Lives)
+		c.fillFallbackSourceNameForArray(c.TvBoxSingleRepoOpt.Parses)
+		c.fillFallbackSourceNameForArray(c.TvBoxSingleRepoOpt.Flags)
+		c.fillFallbackSourceNameForArray(c.TvBoxSingleRepoOpt.Rules)
+		c.fillFallbackSourceNameForArray(c.TvBoxSingleRepoOpt.Ads)
 	}
 
 	// Set default interval for sources
@@ -61,24 +74,32 @@ func (c *Config) fillFallbackSourceName(opt *MixOpt) {
 	}
 }
 
+func (c *Config) fillFallbackSourceNameForArray(opts []ArrayMixOpt) {
+	for i := range opts {
+		if opts[i].SourceName == "" {
+			opts[i].SourceName = c.TvBoxSingleRepoOpt.Fallback.SourceName
+		}
+	}
+}
+
 type LogOpt struct {
 	Output string `mapstructure:"output"` // 日志输出路径, stdout 表示输出到标准输出
 	Level  int    `mapstructure:"level"`  // 日志级别, 0: Trace, 1: Debug, 2: Info, 3: Warn, 4: Error, 5: Fatal, 6: Panic
 }
 
 type TvBoxSingleRepoOpt struct {
-	Disable   bool        `mapstructure:"disable"` // 是否禁用单仓源
-	Spider    MixOpt      `mapstructure:"spider"`
-	Wallpaper MixOpt      `mapstructure:"wallpaper"`
-	Logo      MixOpt      `mapstructure:"logo"`
-	Sites     ArrayMixOpt `mapstructure:"sites"`
-	DOH       ArrayMixOpt `mapstructure:"doh"`
-	Lives     ArrayMixOpt `mapstructure:"lives"`
-	Parses    ArrayMixOpt `mapstructure:"parses"`
-	Flags     ArrayMixOpt `mapstructure:"flags"`
-	Rules     ArrayMixOpt `mapstructure:"rules"`
-	Ads       ArrayMixOpt `mapstructure:"ads"`
-	Fallback  MixOpt      `mapstructure:"fallback"` // 降级配置
+	Disable   bool          `mapstructure:"disable"` // 是否禁用单仓源
+	Spider    MixOpt        `mapstructure:"spider"`
+	Wallpaper MixOpt        `mapstructure:"wallpaper"`
+	Logo      MixOpt        `mapstructure:"logo"`
+	Sites     []ArrayMixOpt `mapstructure:"sites"`
+	DOH       []ArrayMixOpt `mapstructure:"doh"`
+	Lives     []ArrayMixOpt `mapstructure:"lives"`
+	Parses    []ArrayMixOpt `mapstructure:"parses"`
+	Flags     []ArrayMixOpt `mapstructure:"flags"`
+	Rules     []ArrayMixOpt `mapstructure:"rules"`
+	Ads       []ArrayMixOpt `mapstructure:"ads"`
+	Fallback  MixOpt        `mapstructure:"fallback"` // 降级配置
 }
 
 type TvBoxMultiRepoOpt struct {

@@ -103,83 +103,79 @@ func MixTvBoxRepo(
 		}
 	}
 
-	// 混合 sites 数组
-	if !singleRepoOpt.Sites.Disabled && singleRepoOpt.Sites.SourceName != "" {
-		sites, source, err := mixArrayFieldAndGetSource[config.TvBoxSite](singleRepoOpt.Sites, sourcer)
+	// Mix sites array
+	for _, siteOpt := range singleRepoOpt.Sites {
+		sites, source, err := mixArrayFieldAndGetSource[config.TvBoxSite](siteOpt, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing sites: %w", err)
 		}
-		// 处理 Site 结构体的特殊字段
 		for i := range sites {
 			site := processSiteFields(sites[i], source)
 			result.Sites = append(result.Sites, site)
 		}
 	}
 
-	// 混合 doh 数组
-	if !singleRepoOpt.DOH.Disabled && singleRepoOpt.DOH.SourceName != "" {
-		doh, source, err := mixArrayFieldAndGetSource[config.TvBoxDOH](singleRepoOpt.DOH, sourcer)
+	// Mix DOH array
+	for _, dohOpt := range singleRepoOpt.DOH {
+		doh, source, err := mixArrayFieldAndGetSource[config.TvBoxDOH](dohOpt, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing doh: %w", err)
 		}
-		// 处理 DOH 结构体的特殊字段
 		for i := range doh {
 			dohItem := processDOHFields(doh[i], source)
 			result.DOH = append(result.DOH, dohItem)
 		}
 	}
 
-	// 混合 lives 数组
-	if !singleRepoOpt.Lives.Disabled && singleRepoOpt.Lives.SourceName != "" {
-		lives, source, err := mixArrayFieldAndGetSource[config.TvBoxLive](singleRepoOpt.Lives, sourcer)
+	// Mix lives array
+	for _, liveOpt := range singleRepoOpt.Lives {
+		lives, source, err := mixArrayFieldAndGetSource[config.TvBoxLive](liveOpt, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing lives: %w", err)
 		}
-		// 处理 Site 结构体的特殊字段
 		for i := range lives {
 			live := processLiveFields(lives[i], source)
 			result.Lives = append(result.Lives, live)
 		}
 	}
 
-	// 混合 parses 数组
-	if !singleRepoOpt.Parses.Disabled && singleRepoOpt.Parses.SourceName != "" {
-		parses, source, err := mixArrayFieldAndGetSource[config.TvBoxParse](singleRepoOpt.Parses, sourcer)
+	// Mix parses array
+	for _, parseOpt := range singleRepoOpt.Parses {
+		parses, source, err := mixArrayFieldAndGetSource[config.TvBoxParse](parseOpt, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing parses: %w", err)
 		}
-		// 处理 Parse 结构体的特殊字段
 		for i := range parses {
 			parse := processParseFields(parses[i], source)
 			result.Parses = append(result.Parses, parse)
 		}
 	}
 
-	// 混合 flags 数组
-	if !singleRepoOpt.Flags.Disabled && singleRepoOpt.Flags.SourceName != "" {
-		flags, err := mixArrayField[string](singleRepoOpt.Flags, sourcer)
+	// Mix flags array
+	for _, flagOpt := range singleRepoOpt.Flags {
+		flags, err := mixArrayField[string](flagOpt, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing flags: %w", err)
 		}
-		result.Flags = flags
+		result.Flags = append(result.Flags, flags...)
 	}
 
-	// 混合 rules 数组
-	if !singleRepoOpt.Rules.Disabled && singleRepoOpt.Rules.SourceName != "" {
-		rules, err := mixArrayField[config.TvBoxRule](singleRepoOpt.Rules, sourcer)
+	// Mix rules array
+	for _, ruleOpt := range singleRepoOpt.Rules {
+		rules, err := mixArrayField[config.TvBoxRule](ruleOpt, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing rules: %w", err)
 		}
-		result.Rules = rules
+		result.Rules = append(result.Rules, rules...)
 	}
 
-	// 混合 ads 数组
-	if !singleRepoOpt.Ads.Disabled && singleRepoOpt.Ads.SourceName != "" {
-		ads, err := mixArrayField[string](singleRepoOpt.Ads, sourcer)
+	// Mix ads array
+	for _, adOpt := range singleRepoOpt.Ads {
+		ads, err := mixArrayField[string](adOpt, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing ads: %w", err)
 		}
-		result.Ads = ads
+		result.Ads = append(result.Ads, ads...)
 	}
 
 	return result, nil
