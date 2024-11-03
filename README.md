@@ -5,6 +5,8 @@ TV MixProxy 是一个用于混合不同 电视接口 并提供服务的工具。
 ## 功能特点
 
 - 支持TVBox单仓库和TvBox多仓库设置
+- 支持代理 EPG
+- 支持代理 M3U 媒体播放列表
 - 可自定义不同配置字段的混合选项
 - 定期更新源配置
 
@@ -25,6 +27,10 @@ docker run -d --name tv-mixproxy \
 -v $(pwd)/config.yaml:/app/config.yaml \
 ghcr.io/tv-mixproxy/tv-mixproxy:latest
 ```
+
+### Vercel
+
+请参阅 [Vercel 部署](docs/vercel.md)
 
 ## 接口说明
 

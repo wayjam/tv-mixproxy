@@ -183,12 +183,41 @@ func LoadServerConfig(cfgFile string) (*Config, error) {
 		return nil, fmt.Errorf("error reading config file: %v", err)
 	}
 
+	cfg, err := UnmarshalConfig(v)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode into struct: %v", err)
+	}
+
+	return cfg, nil
+}
+
+func UnmarshalConfig(v *viper.Viper) (*Config, error) {
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unable to decode into struct: %v", err)
 	}
-
 	cfg.Fixture()
-
 	return &cfg, nil
+}
+
+func DefaultConfig() *Config {
+	return &Config{
+		ServerPort: 8080,
+		Log: LogOpt{
+			Output: "stdout",
+			Level:  1,
+		},
+		TvBoxSingleRepoOpt: TvBoxSingleRepoOpt{
+			Disable: true,
+		},
+		TvBoxMultiRepoOpt: TvBoxMultiRepoOpt{
+			Disable: true,
+		},
+		EPGOpt: EPGOpt{
+			Disable: true,
+		},
+		M3UOpt: M3UOpt{
+			Disable: true,
+		},
+	}
 }

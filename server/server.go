@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/gofiber/fiber/v3"
@@ -48,6 +49,7 @@ func NewServer(cfg *config.Config) *server {
 	// Set up custom logger format
 	fiberlog.SetOutput(logOutput)
 	fiberlog.SetLevel(fiberlog.Level(cfg.Log.Level))
+	slog.SetDefault(slog.New(slog.NewTextHandler(logOutput, nil)))
 
 	app.Use(logger.New(logger.Config{
 		Output:     logOutput,
@@ -56,7 +58,7 @@ func NewServer(cfg *config.Config) *server {
 		TimeZone:   "Local",
 	}))
 
-	sourceManager := mixer.NewSourceManager(cfg.Sources, fiberlog.DefaultLogger())
+	sourceManager := mixer.NewSourceManager(cfg.Sources, slog.Default())
 
 	return &server{
 		app:           app,
@@ -65,7 +67,8 @@ func NewServer(cfg *config.Config) *server {
 	}
 }
 
-func (s *server) SetupRoutes(app *fiber.App) {
+func (s *server) SetupRoutes() {
+	app := s.app
 	app.Get("/", Home)
 	app.Get("/logo", Logo)
 	app.Get("/wallpaper", Wallpaper)
@@ -78,7 +81,11 @@ func (s *server) SetupRoutes(app *fiber.App) {
 	v1.Get("/m3u/media_playlist", NewM3UMediaHandler(s.cfg, s.sourceManager))
 }
 
-func (s *server) Run() error {
+func (s *server) App() *fiber.App {
+	return s.app
+}
+
+func (s *server) PreRun() error {
 	if !s.cfg.TvBoxSingleRepoOpt.Disable {
 		// Try MixRepo
 		_, err := mixer.MixTvBoxRepo(s.cfg, s.sourceManager)
@@ -95,9 +102,14 @@ func (s *server) Run() error {
 		}
 	}
 
-	s.SetupRoutes(s.app)
-
+	s.SetupRoutes()
 	s.sourceManager.TriggerRefresh()
+	return nil
+}
 
+func (s *server) Run() error {
+	if err := s.PreRun(); err != nil {
+		return err
+	}
 	return s.app.Listen(fmt.Sprintf(":%d", s.cfg.ServerPort))
 }

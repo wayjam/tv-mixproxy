@@ -43,3 +43,7 @@ Thumbs.db
 *.tmp
 *.swp
 *~
+.vercel
+
+# Node
+node_modules/

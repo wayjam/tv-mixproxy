@@ -7,6 +7,8 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
+
 	"github.com/wayjam/tv-mixproxy/config"
 	"github.com/wayjam/tv-mixproxy/pkg/imageutil"
 	"github.com/wayjam/tv-mixproxy/pkg/m3u"
@@ -17,16 +19,46 @@ func Home(c fiber.Ctx) error {
 	return c.SendString("Hello, TV MixProxy 📺!")
 }
 
-func Logo(c fiber.Ctx) error {
-	svgLogo := `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-		<rect x="10" y="20" width="80" height="60" rx="5" ry="5" fill="#333"/>
-		<rect x="15" y="25" width="70" height="50" rx="3" ry="3" fill="#4CAF50"/>
-		<circle cx="50" cy="75" r="5" fill="#333"/>
-		<line x1="30" y1="15" x2="40" y2="5" stroke="#333" stroke-width="2"/>
-		<line x1="70" y1="15" x2="60" y2="5" stroke="#333" stroke-width="2"/>
+func generateLogoSVG() string {
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+		<!-- TV Body with rounded corners and darker green -->
+		<rect x="10" y="15" width="80" height="60" rx="15" ry="15" fill="#2E8B57"/>
+		
+		<!-- TV Screen with white -->
+		<rect x="15" y="20" width="70" height="45" rx="10" ry="10" fill="#FFFFFF"/>
+		
+		<!-- Kawaii face on screen -->
+		<!-- Sparkly eyes -->
+		<circle cx="35" cy="40" r="6" fill="#006400"/>
+		<circle cx="65" cy="40" r="6" fill="#006400"/>
+		<circle cx="33" cy="38" r="2" fill="#FFFFFF"/>
+		<circle cx="63" cy="38" r="2" fill="#FFFFFF"/>
+		
+		<!-- Rosy cheeks -->
+		<circle cx="30" cy="45" r="4" fill="#FF69B4" opacity="0.7"/>
+		<circle cx="70" cy="45" r="4" fill="#FF69B4" opacity="0.7"/>
+		
+		<!-- Cute smile -->
+		<path d="M40 48 Q50 55 60 48" stroke="#006400" stroke-width="3" fill="none"/>
+		
+		<!-- Bouncy antenna with leaves -->
+		<path d="M30 15 Q40 0 50 10" stroke="#228B22" stroke-width="3" fill="none"/>
+		<path d="M70 15 Q60 0 50 10" stroke="#228B22" stroke-width="3" fill="none"/>
+		
+		<!-- Little leaves -->
+		<path d="M50 10 Q53 8 50 6 Q47 8 50 10" fill="#006400"/>
+		<path d="M30 15 Q33 13 30 11 Q27 13 30 15" fill="#006400"/>
+		<path d="M70 15 Q73 13 70 11 Q67 13 70 15" fill="#006400"/>
+		
+		<!-- Decorative buttons -->
+		<circle cx="25" cy="70" r="3" fill="#006400"/>
+		<circle cx="75" cy="70" r="3" fill="#006400"/>
 	</svg>`
+}
+
+func Logo(c fiber.Ctx) error {
 	c.Set("Content-Type", "image/svg+xml")
-	return c.SendString(svgLogo)
+	return c.SendString(generateLogoSVG())
 }
 
 func Wallpaper(c fiber.Ctx) error {
@@ -41,7 +73,6 @@ func Wallpaper(c fiber.Ctx) error {
 	bgColor := imageutil.ParseColor(c.Query("bg_color", "FFFFFF"))
 	borderColor := imageutil.ParseColor(c.Query("border_color", "000000"))
 
-	// Create image parameters
 	params := imageutil.ImageParams{
 		BackgroundColor: bgColor,
 		Width:           width,
@@ -52,12 +83,9 @@ func Wallpaper(c fiber.Ctx) error {
 		BorderColor:     borderColor,
 	}
 
-	// Generate the image
 	img := imageutil.GenerateImage(params)
-
-	// Encode the image to PNG
 	c.Set("Content-Type", "image/png")
-	return png.Encode(c.Response().BodyWriter(), img)
+	return png.Encode(c, img)
 }
 
 func NewRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
@@ -92,13 +120,15 @@ func NewMultiRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager)
 
 func NewSpiderHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
 	handler, err := mixer.NewMixURLHandler(cfg.TvBoxSingleRepoOpt.Spider, sourceManager)
-	if err != nil {
-		return func(c fiber.Ctx) error {
+
+	return func(c fiber.Ctx) error {
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
-	}
 
-	return handler
+		// Convert fiber.Ctx to http.ResponseWriter and *http.Request
+		return adaptor.HTTPHandler(handler)(c)
+	}
 }
 
 func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
@@ -114,7 +144,6 @@ func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber
 
 		format := c.Query("format", "xml")
 
-		// Set appropriate headers
 		c.Set("Content-Type", "application/xml")
 		c.Set("Content-Encoding", "gzip")
 
@@ -122,14 +151,10 @@ func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber
 			c.Set("Content-Disposition", "attachment; filename=epg.xml.gz")
 		}
 
-		// Create a gzip writer
-		gzipWriter := gzip.NewWriter(c.Response().BodyWriter())
+		gzipWriter := gzip.NewWriter(c)
 		defer gzipWriter.Close()
 
-		// Create an XML encoder that writes directly to the gzip writer
 		encoder := xml.NewEncoder(gzipWriter)
-
-		// Encode result directly to the gzip writer
 		if err := encoder.Encode(result); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString("Error encoding and compressing XML")
 		}
@@ -149,7 +174,7 @@ func NewM3UMediaHandler(cfg *config.Config, sourceManager *mixer.SourceManager) 
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 
-		encoder := m3u.NewEncoder(c.Response().BodyWriter())
+		encoder := m3u.NewEncoder(c)
 		if err := encoder.Encode(result); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
