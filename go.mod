@@ -1,8 +1,8 @@
 module github.com/wayjam/tv-mixproxy
 
-go 1.22.3
+go 1.21
 
-replace github.com/jamesnetherton/m3u => github.com/wayjam/m3u v0.0.0-20241029160035-d1ef859bcb0c
+toolchain go1.23.2
 
 require (
 	github.com/gofiber/fiber/v3 v3.0.0-beta.3

@@ -2,11 +2,10 @@ package mixer
 
 import (
 	"fmt"
+	"log/slog"
 	"math"
 	"sync"
 	"time"
-
-	fiberlog "github.com/gofiber/fiber/v3/log"
 
 	"github.com/wayjam/tv-mixproxy/config"
 )
@@ -33,7 +32,7 @@ type SourceManager struct {
 	ticker  *time.Ticker
 	done    chan bool
 	refresh chan bool
-	logger  fiberlog.CommonLogger
+	logger  *slog.Logger
 }
 
 type Source struct {
@@ -64,13 +63,16 @@ func (s *Source) GetSource(_ string) ([]byte, error) {
 	return s.data, nil
 }
 
-func NewSourceManager(sources []config.Source, logger fiberlog.CommonLogger) *SourceManager {
+func NewSourceManager(sources []config.Source, logger *slog.Logger) *SourceManager {
 	sm := &SourceManager{
 		sources: make(map[string]*Source),
 		ticker:  time.NewTicker(1 * time.Minute), // 每分钟检查一次
 		done:    make(chan bool),
 		refresh: make(chan bool),
-		logger:  logger,
+	}
+
+	if logger != nil {
+		sm.logger = logger.With("manager", "source_manager")
 	}
 
 	for _, s := range sources {
@@ -82,6 +84,12 @@ func NewSourceManager(sources []config.Source, logger fiberlog.CommonLogger) *So
 	go sm.refreshLoop()
 
 	return sm
+}
+
+func (sm *SourceManager) log(format string, args ...any) {
+	if sm.logger != nil {
+		sm.logger.Info(fmt.Sprintf(format, args...))
+	}
 }
 
 func (sm *SourceManager) refreshLoop() {
@@ -153,9 +161,7 @@ func (sm *SourceManager) refreshSource(name string) error {
 	var err error
 
 	defer func() {
-		if sm.logger != nil {
-			sm.logger.Infow("refresh source", "name", name, "error", err)
-		}
+		sm.log("refresh source %s: %v", name, err)
 	}()
 
 	switch source.Type() {

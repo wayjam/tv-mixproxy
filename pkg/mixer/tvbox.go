@@ -6,57 +6,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/proxy"
 	"github.com/tidwall/gjson"
 
 	"github.com/wayjam/tv-mixproxy/config"
 )
-
-var (
-	nullHandler fiber.Handler = func(c fiber.Ctx) error {
-		return nil
-	}
-)
-
-func NewMixURLHandler(
-	mixOpt config.MixOpt, sourcer Sourcer,
-) (fiber.Handler, error) {
-	if mixOpt.Disabled || mixOpt.SourceName == "" {
-		return nullHandler, nil
-	}
-
-	// 如果 source_name 以 file:// 开头，则返回一个 fiber 处理器，该处理器从文件系统中读取文件内容
-	if strings.HasPrefix(mixOpt.SourceName, "file://") {
-		// Extract file path from the source name
-		filePath := strings.TrimPrefix(mixOpt.SourceName, "file://")
-
-		// Return a fiber handler that serves the file content
-		return func(c fiber.Ctx) error {
-			return c.SendFile(filePath)
-		}, nil
-	}
-
-	url, source, err := mixFieldAndGetSource(mixOpt, sourcer)
-	if err != nil {
-		return nullHandler, fmt.Errorf("mixing url: %w", err)
-	}
-
-	if source.Type() != config.SourceTypeTvBoxSingle {
-		return nullHandler, fmt.Errorf("source %s should be a single source", mixOpt.SourceName)
-	}
-
-	if url == "" {
-		return nullHandler, nil
-	}
-
-	// 移除 URL 中可能存在的校验信息
-	url = strings.Split(url, ";")[0]
-	// 如果是相对路径，则返回一个 proxy 处理器，该处理器将请求转发到相对路径
-	url = fullFillURL(url, source)
-
-	return proxy.Forward(url), nil
-}
 
 // MixTvBoxRepo 函数根据配置混合多个单仓源
 func MixTvBoxRepo(

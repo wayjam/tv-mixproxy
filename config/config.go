@@ -183,12 +183,19 @@ func LoadServerConfig(cfgFile string) (*Config, error) {
 		return nil, fmt.Errorf("error reading config file: %v", err)
 	}
 
+	cfg, err := UnmarshalConfig(v)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode into struct: %v", err)
+	}
+
+	return cfg, nil
+}
+
+func UnmarshalConfig(v *viper.Viper) (*Config, error) {
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unable to decode into struct: %v", err)
 	}
-
 	cfg.Fixture()
-
 	return &cfg, nil
 }
