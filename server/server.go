@@ -72,6 +72,7 @@ func (s *server) SetupRoutes() {
 	app.Get("/", Home)
 	app.Get("/logo", Logo)
 	app.Get("/wallpaper", Wallpaper)
+	app.Get("/refresh_source", RefershSrouceHandler(s.cfg, s.sourceManager))
 
 	v1 := app.Group("/v1")
 	v1.Get("/tvbox/repo", NewRepoHandler(s.cfg, s.sourceManager))
@@ -103,7 +104,7 @@ func (s *server) PreRun() error {
 	}
 
 	s.SetupRoutes()
-	s.sourceManager.TriggerRefresh()
+	s.sourceManager.TriggerRefresh(true)
 	return nil
 }
 

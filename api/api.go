@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/spf13/viper"
+
 	"github.com/wayjam/tv-mixproxy/config"
 	"github.com/wayjam/tv-mixproxy/server"
 )

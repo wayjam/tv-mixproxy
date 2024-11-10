@@ -8,5 +8,9 @@
             "source": "/(.*)",
             "destination": "/api/api"
         }
-    ]
-  }
+    ],
+    "crons": [{
+      "path": "/refresh_source",
+      "schedule": "* * * * *"
+    }]
+}

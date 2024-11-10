@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"encoding/xml"
 	"image/png"
+	"os"
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
@@ -180,5 +181,17 @@ func NewM3UMediaHandler(cfg *config.Config, sourceManager *mixer.SourceManager) 
 		}
 
 		return nil
+	}
+}
+
+func RefershSrouceHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		token := os.Getenv("CRON_SECRET")
+		if c.Get("Authorization") != "Bearer "+token {
+			return c.Status(fiber.StatusUnauthorized).SendString("Unauthorized")
+		}
+
+		go sourceManager.TriggerRefresh(false)
+		return c.SendStatus(fiber.StatusOK)
 	}
 }

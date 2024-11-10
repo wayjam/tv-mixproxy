@@ -41,6 +41,7 @@ type Source struct {
 	data       []byte // Change this to []byte
 	lastError  time.Time
 	errorCount int
+	refreshing bool // 添加标志位
 }
 
 func (s *Source) Data() []byte {
@@ -97,8 +98,8 @@ func (sm *SourceManager) refreshLoop() {
 		select {
 		case <-sm.ticker.C:
 			sm.refreshExpiredSources(false)
-		case <-sm.refresh:
-			sm.refreshExpiredSources(true)
+		case force := <-sm.refresh:
+			sm.refreshExpiredSources(force)
 		case <-sm.done:
 			sm.ticker.Stop()
 			return
@@ -146,6 +147,12 @@ func (sm *SourceManager) refreshSource(name string) error {
 		return fmt.Errorf("source not found: %s", name)
 	}
 
+	// 如果已经在刷新中，直接返回
+	if source.refreshing {
+		sm.mu.Unlock()
+		return nil
+	}
+
 	// 指数退避
 	if !source.lastError.IsZero() {
 		backoff := time.Duration(math.Pow(2, float64(source.errorCount))) * time.Second
@@ -155,7 +162,15 @@ func (sm *SourceManager) refreshSource(name string) error {
 		}
 	}
 
+	source.refreshing = true
 	sm.mu.Unlock()
+
+	// 确保在函数结束时清除刷新标志
+	defer func() {
+		sm.mu.Lock()
+		source.refreshing = false
+		sm.mu.Unlock()
+	}()
 
 	var data []byte
 	var err error
@@ -195,6 +210,6 @@ func (sm *SourceManager) Close() {
 	sm.done <- true
 }
 
-func (sm *SourceManager) TriggerRefresh() {
-	sm.refresh <- true
+func (sm *SourceManager) TriggerRefresh(force bool) {
+	sm.refresh <- force
 }
