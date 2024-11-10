@@ -8,3 +8,13 @@
 1. Vercel Blob
 2. Github + jsDelivr CDN
 3. 其他
+
+## 定时刷新
+
+Vercel 支持定时刷新，可以在 `vercel.json` 中配置定时刷新任务。由于 Hobby 免费版账号 Cron 次数有限，如果开启来 Pro 建议 Frok 修改。或其他定时工具通过接口触发
+
+> 需要配置 `TV_MIXPROXY_SECRET` 环境变量
+
+```sh
+curl -X GET -H "X-TV-MIXPROXY-SECRET: <token>" https://tv-mixproxy.vercel.app/refresh_source
+```

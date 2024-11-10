@@ -186,8 +186,18 @@ func NewM3UMediaHandler(cfg *config.Config, sourceManager *mixer.SourceManager) 
 
 func RefershSrouceHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		token := os.Getenv("CRON_SECRET")
-		if c.Get("Authorization") != "Bearer "+token {
+		cronSecret := os.Getenv("CRON_SECRET")
+		token := os.Getenv("TV_MIXPROXY_SECRET")
+
+		pass := false
+
+		if cronSecret != "" && c.Get("Authorization") == "Bearer "+cronSecret {
+			pass = true
+		} else if token != "" && c.Get("X-TV-MIXPROXY-SECRET") == token {
+			pass = true
+		}
+
+		if !pass {
 			return c.Status(fiber.StatusUnauthorized).SendString("Unauthorized")
 		}
 
