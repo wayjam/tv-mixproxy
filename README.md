@@ -1,5 +1,11 @@
 # TV MixProxy
 
+![GitHub License](https://img.shields.io/github/license/wayjam/tv-mixproxy)
+![GitHub Release](https://img.shields.io/github/v/release/wayjam/tv-mixproxy)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white&link=https://github.com/wayjam/tv-mixproxy/pkgs/container/tv-mixproxy)
+![Vercel](https://img.shields.io/badge/Vercel-333?logo=vercel&link=https://github.com/wayjam/tv-mixproxy/blob/main/docs/vercel.md)
+![GitHub Actions](https://github.com/wayjam/tv-mixproxy/actions/workflows/test.yml/badge.svg)
+
 TV MixProxy 是一个用于混合不同 电视接口 并提供服务的工具。它支持单仓配置和多仓配置，可以轻松地整合多个来源配置。
 
 ## 功能特点
