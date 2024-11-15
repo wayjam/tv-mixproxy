@@ -79,4 +79,5 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: build.yml
-          inputs: '{ "dry_run": ${{ inputs.dry_run }} }'
+          inputs: '{ "dry_run": ${{ inputs.dry_run }}, "tag": "${{ steps.tag_version.outputs.new_tag }}" }'
+          ref: ${{ steps.tag_version.outputs.new_tag }}
