@@ -7,16 +7,34 @@ import (
 	"strings"
 
 	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/auth"
 	"github.com/wayjam/tv-mixproxy/pkg/cleaner"
 	"github.com/wayjam/tv-mixproxy/pkg/m3u"
 	"github.com/wayjam/tv-mixproxy/pkg/txt"
 )
 
+// MixOptions 混流上下文选项（携带当前请求的用户身份与 Token）
+type MixOptions struct {
+	User  *auth.User
+	Token string
+}
+
 func MixM3UMediaPlayList(
-	cfg *config.Config, sourcer Sourcer,
+	cfg *config.Config, sourcer Sourcer, opts ...MixOptions,
 ) (*m3u.Playlist, error) {
 	if cfg.M3UOpt.Disable {
 		return nil, nil
+	}
+
+	var user *auth.User
+	var token string
+	if len(opts) > 0 {
+		user = opts[0].User
+		token = opts[0].Token
+	}
+	tokenParam := cfg.SecurityOpt.TokenParam
+	if tokenParam == "" {
+		tokenParam = "token"
 	}
 
 	result := m3u.NewPlaylist()
@@ -109,13 +127,22 @@ func MixM3UMediaPlayList(
 				track.SetTag("group-title", cfg.M3UOpt.DefaultGroup)
 			}
 
-			// 若开启流代理或需要防盗链，重写流地址为本地代理
+			// 权限校验：若当前用户有分组权限限制，过滤非授权分组
+			if user != nil && !user.IsGroupAllowed(track.GetTag("group-title")) {
+				continue
+			}
+
+			// 若开启流代理或需要防盗链，重写流地址为本地代理，并携带当前用户 Token 传播
 			if shouldProxy && track.URI != "" {
-				track.URI = fmt.Sprintf("%s/v1/stream/proxy?url=%s&source=%s",
+				proxyURL := fmt.Sprintf("%s/v1/stream/proxy?url=%s&source=%s",
 					getExternalURL(cfg),
 					url.QueryEscape(track.URI),
 					url.QueryEscape(filter.SourceName),
 				)
+				if token != "" {
+					proxyURL = appendToken(proxyURL, token, tokenParam)
+				}
+				track.URI = proxyURL
 			}
 
 			candidates = append(candidates, TrackCandidate{
@@ -125,7 +152,6 @@ func MixM3UMediaPlayList(
 				OriginalIndex: len(candidates),
 			})
 		}
-
 		for i := range playlist.VariantStreams {
 			variant := playlist.VariantStreams[i]
 			if filter.FilterBy != "" {
@@ -140,17 +166,31 @@ func MixM3UMediaPlayList(
 	// 执行同名聚合与多线路合并
 	aggregator := NewAggregator(cfg.M3UOpt)
 	result.Tracks = aggregator.Aggregate(candidates)
-	// Process EPG URLs injection
+	// Process EPG URLs injection with token propagation
 	if len(cfg.M3UOpt.EPGURLs) > 0 {
 		var resolvedEPGs []string
 		for _, u := range cfg.M3UOpt.EPGURLs {
 			u = strings.ReplaceAll(u, "{external_url}", getExternalURL(cfg))
+			if token != "" && strings.Contains(u, getExternalURL(cfg)) {
+				u = appendToken(u, token, tokenParam)
+			}
 			resolvedEPGs = append(resolvedEPGs, u)
 		}
 		result.SetTag("x-tvg-url", strings.Join(resolvedEPGs, ","))
-	} else if !cfg.EPGOpt.Disable && result.GetTag("x-tvg-url") == "" {
-		result.SetTag("x-tvg-url", getExternalURL(cfg)+"/v1/epg.xml")
+	} else if existing := result.GetTag("x-tvg-url"); existing != "" {
+		if strings.Contains(existing, "{external_url}") {
+			existing = strings.ReplaceAll(existing, "{external_url}", getExternalURL(cfg))
+			if token != "" && strings.Contains(existing, getExternalURL(cfg)) {
+				existing = appendToken(existing, token, tokenParam)
+			}
+			result.SetTag("x-tvg-url", existing)
+		}
+	} else if !cfg.EPGOpt.Disable {
+		epgURL := getExternalURL(cfg) + "/v1/epg.xml"
+		if token != "" {
+			epgURL = appendToken(epgURL, token, tokenParam)
+		}
+		result.SetTag("x-tvg-url", epgURL)
 	}
-
 	return &result, nil
 }

@@ -72,6 +72,13 @@ tvbox_single_repo_opt:
 - 针对必须携带 `Referer`、`User-Agent` 等自定义防盗链请求头的视频流，提供 `/v1/stream/proxy` 透明代理接口。
 - 支持自动重写（`auto_proxy: true`）或源级指定（`proxy_stream: true`）。
 - 针对 M3U8 二级切片自动递归重写代理地址，TS 切片采用 SendStream 零积压流式中转。
+13. 统一访问控制与多用户权限管理（Access Control & Multi-user）：
+
+- **单用户极简模式**：配置 `security_opt.access_key`，客户端可通过 Query 参数（如 `?token=xxx`）或 Header（`X-Access-Key: xxx` 或 `Authorization: Bearer xxx`）访问。
+- **多用户多 Key 体系**：在 `security_opt.users` 中定义多个用户，支持独立的 `id`、`key`、启用状态（`enabled`）、有效期截止（`expire_at`）以及频道分组白名单（`allowed_groups`）。
+- **电视端 Token 自传播（Token Self-Propagation）**：TVBox、TiviMate 等电视播放器在次级抓取 EPG 或流代理时无法设置自定义 HTTP 请求头。服务会自动将当前请求的 Token 注入到导出的 `x-tvg-url`、视频流代理地址（`/v1/stream/proxy`）、TVBox spider 以及单仓地址中，客户端只需在初始订阅链接中添加一次 `?token=xxx` 即可全局免认证畅通。
+- **用户级缓存强隔离**：服务端针对不同用户身份单独计算缓存（如 `m3u_media_playlist_kids` 与 `m3u_media_playlist_admin`），彻底杜绝低权限用户通过缓存越权获取全量频道的安全隐患。
+- **免认证白名单**：默认允许免认证访问 `["/", "/logo", "/wallpaper"]`，可通过 `whitelist_paths` 自定义。
 
 ## Log
 
@@ -196,4 +203,25 @@ m3u_opt:
     - source_name: "live_source"
       filter_by: "name"
       include: ".*"
+security_opt:
+  enable: true                 # 是否开启全局访问鉴权
+  access_key: "single_secret"  # 单用户模式 Access Key（与 users 兼容互通）
+  token_param: "token"         # Query 参数提取字段（默认 token，可改为 key 等）
+  header_name: "X-Access-Key"  # 自定义请求头名称
+  whitelist_paths:             # 免认证公开白名单
+    - "/"
+    - "/logo"
+    - "/wallpaper"
+  users:                       # 多用户细粒度权限列表
+    - id: "living_room"
+      key: "living_room_secret"
+      enabled: true
+      # allowed_groups 为空时允许访问所有频道
+    - id: "kids_room"
+      key: "kids_secret"
+      enabled: true
+      expire_at: "2027-12-31T23:59:59Z"
+      allowed_groups:          # 仅允许观看指定分组的频道
+        - "少儿频道"
+        - "卡通动漫"
 ```

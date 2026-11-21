@@ -116,6 +116,21 @@ func (c *Config) Fixture() {
 	if c.M3UOpt.MergeMode == "" {
 		c.M3UOpt.MergeMode = "rename"
 	}
+
+	// Set default Security options
+	if c.SecurityOpt.TokenParam == "" {
+		c.SecurityOpt.TokenParam = "token"
+	}
+	if c.SecurityOpt.HeaderName == "" {
+		c.SecurityOpt.HeaderName = "X-Access-Key"
+	}
+	if len(c.SecurityOpt.WhitelistPaths) == 0 {
+		c.SecurityOpt.WhitelistPaths = []string{
+			"/",
+			"/logo",
+			"/wallpaper",
+		}
+	}
 }
 
 func (c *Config) fillFallbackSourceName(opt *MixOpt) {
@@ -253,11 +268,35 @@ type PersistenceOpt struct {
 }
 
 type SecurityOpt struct {
-	Secret    string `mapstructure:"secret"`     // API 刷新密钥，替代/补充环境变量 TV_MIXPROXY_SECRET
-	APISecret string `mapstructure:"api_secret"` // 别名支持
+	Enable         bool      `mapstructure:"enable"`          // 是否启用全局鉴权
+	AccessKey      string    `mapstructure:"access_key"`      // 单用户全局密钥
+	Secret         string    `mapstructure:"secret"`          // API 刷新密钥，兼任单用户 AccessKey
+	APISecret      string    `mapstructure:"api_secret"`      // 别名支持
+	TokenParam     string    `mapstructure:"token_param"`     // 允许的 Query 参数名，默认 "token"
+	HeaderName     string    `mapstructure:"header_name"`     // 允许的自定义 Header 名，默认 "X-Access-Key"
+	WhitelistPaths []string  `mapstructure:"whitelist_paths"` // 免鉴权白名单路径前缀
+	Users          []UserOpt `mapstructure:"users"`           // 多用户清单
+}
+
+type UserOpt struct {
+	ID            string   `mapstructure:"id"`             // 用户唯一标识，如 "living_room"
+	Key           string   `mapstructure:"key"`            // 用户的 AccessKey
+	Enabled       *bool    `mapstructure:"enabled"`        // 是否启用（指针类型，nil默认为 true）
+	ExpireAt      string   `mapstructure:"expire_at"`      // 过期时间，格式 "2006-01-02" 或 "2006-01-02 15:04:05"
+	AllowedGroups []string `mapstructure:"allowed_groups"` // 允许访问的频道分组
+}
+
+func (u UserOpt) IsEnabled() bool {
+	if u.Enabled == nil {
+		return true
+	}
+	return *u.Enabled
 }
 
 func (s SecurityOpt) GetSecret() string {
+	if s.AccessKey != "" {
+		return s.AccessKey
+	}
 	if s.Secret != "" {
 		return s.Secret
 	}

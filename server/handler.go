@@ -168,9 +168,14 @@ func NewRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cach
 			return c.Status(fiber.StatusNotImplemented).SendString("SingleRepo is disabled")
 		}
 
+		userID := getUserID(c)
 		version := sourceManager.GetFingerprint()
-		return sendCachedOrCompute(c, cfg, cacheManager, "tvbox_repo", version, "application/json; charset=utf-8", true, nil, func() ([]byte, error) {
-			result, err := mixer.MixTvBoxRepo(cfg, sourceManager)
+		cacheKey := fmt.Sprintf("tvbox_repo_%s", userID)
+		return sendCachedOrCompute(c, cfg, cacheManager, cacheKey, version, "application/json; charset=utf-8", true, nil, func() ([]byte, error) {
+			result, err := mixer.MixTvBoxRepo(cfg, sourceManager, mixer.MixOptions{
+				User:  GetCurrentUser(c),
+				Token: GetCurrentToken(c),
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -178,16 +183,20 @@ func NewRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cach
 		})
 	}
 }
-
 func NewMultiRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cacheManager *cache.Manager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if cfg.TvBoxMultiRepoOpt.Disable {
 			return c.Status(fiber.StatusNotImplemented).SendString("MultiRepo is disabled")
 		}
 
+		userID := getUserID(c)
 		version := sourceManager.GetFingerprint()
-		return sendCachedOrCompute(c, cfg, cacheManager, "tvbox_multi_repo", version, "application/json; charset=utf-8", true, nil, func() ([]byte, error) {
-			result, err := mixer.MixMultiRepo(cfg, sourceManager)
+		cacheKey := fmt.Sprintf("tvbox_multi_repo_%s", userID)
+		return sendCachedOrCompute(c, cfg, cacheManager, cacheKey, version, "application/json; charset=utf-8", true, nil, func() ([]byte, error) {
+			result, err := mixer.MixMultiRepo(cfg, sourceManager, mixer.MixOptions{
+				User:  GetCurrentUser(c),
+				Token: GetCurrentToken(c),
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -195,7 +204,6 @@ func NewMultiRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager,
 		})
 	}
 }
-
 func NewSpiderHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
 	handler, err := mixer.NewMixURLHandler(cfg.TvBoxSingleRepoOpt.Spider, sourceManager)
 
@@ -216,13 +224,15 @@ func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cache
 		}
 
 		format := c.Query("format", "xml")
+		userID := getUserID(c)
 		version := sourceManager.GetFingerprint()
 
 		if format == "gz" {
 			headers := map[string]string{
 				"Content-Disposition": "attachment; filename=epg.xml.gz",
 			}
-			return sendCachedOrCompute(c, cfg, cacheManager, "epg_xml_gz", version, "application/gzip", true, headers, func() ([]byte, error) {
+			cacheKey := fmt.Sprintf("epg_xml_gz_%s", userID)
+			return sendCachedOrCompute(c, cfg, cacheManager, cacheKey, version, "application/gzip", true, headers, func() ([]byte, error) {
 				result, err := mixer.MixEPG(cfg, sourceManager)
 				if err != nil {
 					return nil, err
@@ -244,7 +254,8 @@ func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cache
 			})
 		}
 
-		return sendCachedOrCompute(c, cfg, cacheManager, "epg_xml", version, "application/xml; charset=utf-8", true, nil, func() ([]byte, error) {
+		cacheKey := fmt.Sprintf("epg_xml_%s", userID)
+		return sendCachedOrCompute(c, cfg, cacheManager, cacheKey, version, "application/xml; charset=utf-8", true, nil, func() ([]byte, error) {
 			result, err := mixer.MixEPG(cfg, sourceManager)
 			if err != nil {
 				return nil, err
@@ -269,9 +280,14 @@ func NewM3UMediaHandler(cfg *config.Config, sourceManager *mixer.SourceManager, 
 			return c.Status(fiber.StatusNotImplemented).SendString("M3U is disabled")
 		}
 
+		userID := getUserID(c)
 		version := sourceManager.GetFingerprint()
-		return sendCachedOrCompute(c, cfg, cacheManager, "m3u_media_playlist", version, "application/vnd.apple.mpegurl; charset=utf-8", true, nil, func() ([]byte, error) {
-			result, err := mixer.MixM3UMediaPlayList(cfg, sourceManager)
+		cacheKey := fmt.Sprintf("m3u_media_playlist_%s", userID)
+		return sendCachedOrCompute(c, cfg, cacheManager, cacheKey, version, "application/vnd.apple.mpegurl; charset=utf-8", true, nil, func() ([]byte, error) {
+			result, err := mixer.MixM3UMediaPlayList(cfg, sourceManager, mixer.MixOptions{
+				User:  GetCurrentUser(c),
+				Token: GetCurrentToken(c),
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -287,7 +303,6 @@ func RefershSrouceHandler(cfg *config.Config, sourceManager *mixer.SourceManager
 		if cfg != nil && cfg.SecurityOpt.GetSecret() != "" {
 			token = cfg.SecurityOpt.GetSecret()
 		}
-
 		pass := false
 		authHeader := c.Get("Authorization")
 		secretHeader := c.Get("X-TV-MIXPROXY-SECRET")
@@ -319,9 +334,14 @@ func NewLiveTXTHandler(cfg *config.Config, sourceManager *mixer.SourceManager, c
 			return c.Status(fiber.StatusNotImplemented).SendString("Live list is disabled")
 		}
 
+		userID := getUserID(c)
 		version := sourceManager.GetFingerprint()
-		return sendCachedOrCompute(c, cfg, cacheManager, "live_txt", version, "text/plain; charset=utf-8", true, nil, func() ([]byte, error) {
-			result, err := mixer.MixTXT(cfg, sourceManager)
+		cacheKey := fmt.Sprintf("live_txt_%s", userID)
+		return sendCachedOrCompute(c, cfg, cacheManager, cacheKey, version, "text/plain; charset=utf-8", true, nil, func() ([]byte, error) {
+			result, err := mixer.MixTXT(cfg, sourceManager, mixer.MixOptions{
+				User:  GetCurrentUser(c),
+				Token: GetCurrentToken(c),
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -339,8 +359,8 @@ func NewDIYPHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cach
 		ch := c.Query("ch")
 		date := c.Query("date")
 		version := sourceManager.GetFingerprint()
-		cacheKey := fmt.Sprintf("diyp_%s_%s", ch, date)
-
+		userID := getUserID(c)
+		cacheKey := fmt.Sprintf("diyp_%s_%s_%s", ch, date, userID)
 		return sendCachedOrCompute(c, cfg, cacheManager, cacheKey, version, "application/json; charset=utf-8", false, nil, func() ([]byte, error) {
 			result, err := mixer.QueryDIYPEPG(cfg, sourceManager, ch, date)
 			if err != nil {
@@ -349,4 +369,11 @@ func NewDIYPHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cach
 			return json.Marshal(result)
 		})
 	}
+}
+
+func getUserID(c fiber.Ctx) string {
+	if u := GetCurrentUser(c); u != nil && u.ID != "" {
+		return u.ID
+	}
+	return "public"
 }

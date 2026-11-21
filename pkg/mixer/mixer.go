@@ -81,3 +81,16 @@ func NewMixURLHandler(
 
 	return proxy, nil
 }
+func appendToken(rawURL string, token string, tokenParam string) string {
+	if token == "" || rawURL == "" {
+		return rawURL
+	}
+	if tokenParam == "" {
+		tokenParam = "token"
+	}
+	separator := "?"
+	if strings.Contains(rawURL, "?") {
+		separator = "&"
+	}
+	return rawURL + separator + tokenParam + "=" + url.QueryEscape(token)
+}

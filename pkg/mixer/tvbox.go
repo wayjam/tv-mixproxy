@@ -15,12 +15,26 @@ import (
 
 // MixTvBoxRepo 函数根据配置混合多个单仓源
 func MixTvBoxRepo(
-	cfg *config.Config, sourcer Sourcer,
+	cfg *config.Config, sourcer Sourcer, opts ...MixOptions,
 ) (*config.TvBoxRepoConfig, error) {
+	var token string
+	if len(opts) > 0 {
+		token = opts[0].Token
+	}
+	tokenParam := cfg.SecurityOpt.TokenParam
+	if tokenParam == "" {
+		tokenParam = "token"
+	}
+
+	spiderURL := getExternalURL(cfg) + "/v1/tvbox/spider"
+	if token != "" {
+		spiderURL = appendToken(spiderURL, token, tokenParam)
+	}
+
 	result := &config.TvBoxRepoConfig{
 		Wallpaper: getExternalURL(cfg) + "/wallpaper?bg_color=333333&border_width=5&border_color=666666",
 		Logo:      getExternalURL(cfg) + "/logo",
-		Spider:    getExternalURL(cfg) + "/v1/tvbox/spider",
+		Spider:    spiderURL,
 	}
 	singleRepoOpt := cfg.TvBoxSingleRepoOpt
 
@@ -94,11 +108,18 @@ func MixTvBoxRepo(
 				epgURL := ""
 				if !cfg.EPGOpt.Disable {
 					epgURL = getExternalURL(cfg) + "/v1/epg.xml"
+					if token != "" {
+						epgURL = appendToken(epgURL, token, tokenParam)
+					}
+				}
+				mediaURL := getExternalURL(cfg) + "/v1/m3u/media_playlist"
+				if token != "" {
+					mediaURL = appendToken(mediaURL, token, tokenParam)
 				}
 				result.Lives = append(result.Lives, config.TvBoxLive{
 					Name:       "TV MixProxy",
 					Type:       0,
-					URL:        getExternalURL(cfg) + "/v1/m3u/media_playlist",
+					URL:        mediaURL,
 					PlayerType: 1,
 					EPG:        epgURL,
 					Logo:       getExternalURL(cfg) + "/logo",
@@ -265,8 +286,16 @@ func filterArray(array []gjson.Result, opt config.ArrayMixOpt) ([]gjson.Result, 
 
 // MixMultiRepo 函数根据配置混合多个多仓源
 func MixMultiRepo(
-	cfg *config.Config, sourcer Sourcer,
+	cfg *config.Config, sourcer Sourcer, opts ...MixOptions,
 ) (*config.TvBoxMultiRepoConfig, error) {
+	var token string
+	if len(opts) > 0 {
+		token = opts[0].Token
+	}
+	tokenParam := cfg.SecurityOpt.TokenParam
+	if tokenParam == "" {
+		tokenParam = "token"
+	}
 	multiRepoOpt := cfg.TvBoxMultiRepoOpt
 
 	result := &config.TvBoxMultiRepoConfig{
@@ -275,9 +304,13 @@ func MixMultiRepo(
 
 	// 如果需要包含单仓源
 	if multiRepoOpt.IncludeSingleRepo {
+		singleRepoURL := getExternalURL(cfg) + "/v1/tvbox/repo"
+		if token != "" {
+			singleRepoURL = appendToken(singleRepoURL, token, tokenParam)
+		}
 		result.Repos = append(result.Repos, config.TvBoxRepoURLConfig{
 			Name: "Tv MixProxy",
-			URL:  getExternalURL(cfg) + "/v1/tvbox/repo",
+			URL:  singleRepoURL,
 		})
 	}
 

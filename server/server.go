@@ -15,6 +15,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/auth"
 	"github.com/wayjam/tv-mixproxy/pkg/cache"
 	"github.com/wayjam/tv-mixproxy/pkg/mixer"
 )
@@ -24,6 +25,7 @@ type server struct {
 	cfg           *config.Config
 	sourceManager *mixer.SourceManager
 	cacheManager  *cache.Manager
+	authManager   *auth.Manager
 }
 
 func NewServer(cfg *config.Config) *server {
@@ -67,12 +69,16 @@ func NewServer(cfg *config.Config) *server {
 		MaxEntries: cfg.CacheOpt.MaxEntries,
 		MaxBytes:   int64(cfg.CacheOpt.MaxMemoryMB) * 1024 * 1024,
 	})
+	authManager := auth.NewManager(cfg.SecurityOpt)
+
+	app.Use(NewAuthMiddleware(authManager))
 
 	return &server{
 		app:           app,
 		cfg:           cfg,
 		sourceManager: sourceManager,
 		cacheManager:  cacheManager,
+		authManager:   authManager,
 	}
 }
 

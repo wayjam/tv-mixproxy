@@ -6,8 +6,8 @@ import (
 )
 
 // MixTXT 混合直播源并转换为标准 TXT/DIYP 格式
-func MixTXT(cfg *config.Config, sourcer Sourcer) (*txt.Playlist, error) {
-	m3uPl, err := MixM3UMediaPlayList(cfg, sourcer)
+func MixTXT(cfg *config.Config, sourcer Sourcer, opts ...MixOptions) (*txt.Playlist, error) {
+	m3uPl, err := MixM3UMediaPlayList(cfg, sourcer, opts...)
 	if err != nil {
 		return nil, err
 	}
