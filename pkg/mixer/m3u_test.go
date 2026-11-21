@@ -114,4 +114,86 @@ http://example.com/zhejiang.m3u8
 		// Custom multi-EPG URLs
 		assert.Equal(t, "http://proxy.test/v1/epg.xml,http://backup.epg/e.xml", result.GetTag("x-tvg-url"))
 	})
+	t.Run("Multi-source Channel Aggregation and Priority", func(t *testing.T) {
+		srcLow := `#EXTM3U
+#EXTINF:-1 group-title="央视",CCTV-1
+http://low.example.com/cctv1.m3u8
+`
+		srcHigh := `#EXTM3U
+#EXTINF:-1 group-title="央视",CCTV-1
+http://high.example.com/cctv1.m3u8
+`
+		sourcer := &MockSourcer{
+			sources: map[string]*Source{
+				"src_low": {
+					config: config.Source{Name: "src_low", Type: config.SourceTypeM3U, Priority: 10},
+					data:   []byte(srcLow),
+				},
+				"src_high": {
+					config: config.Source{Name: "src_high", Type: config.SourceTypeM3U, Priority: 100},
+					data:   []byte(srcHigh),
+				},
+			},
+		}
+
+		cfg := &config.Config{
+			ServerPort:  8080,
+			ExternalURL: "http://proxy.test",
+			M3UOpt: config.M3UOpt{
+				MergeDuplicateChannels: true,
+				MergeMode:              "rename",
+				MediaPlaylistFilters: []config.ArrayMixOpt{
+					{MixOpt: config.MixOpt{SourceName: "src_low"}},
+					{MixOpt: config.MixOpt{SourceName: "src_high"}},
+				},
+			},
+		}
+
+		result, err := MixM3UMediaPlayList(cfg, sourcer)
+		assert.NoError(t, err)
+		assert.Len(t, result.Tracks, 2)
+
+		// Priority 100 stream should be line 1, Priority 10 stream should be line 2
+		assert.Equal(t, "CCTV-1 (线路1)", result.Tracks[0].Name)
+		assert.Equal(t, "http://high.example.com/cctv1.m3u8", result.Tracks[0].URI)
+		assert.Equal(t, "CCTV-1 (线路2)", result.Tracks[1].Name)
+		assert.Equal(t, "http://low.example.com/cctv1.m3u8", result.Tracks[1].URI)
+	})
+
+	t.Run("Stream Proxy URL Rewriting", func(t *testing.T) {
+		srcData := `#EXTM3U
+#EXTINF:-1,CCTV-1
+http://upstream.com/live.m3u8
+`
+		sourcer := &MockSourcer{
+			sources: map[string]*Source{
+				"proxy_src": {
+					config: config.Source{
+						Name:        "proxy_src",
+						Type:        config.SourceTypeM3U,
+						ProxyStream: true,
+					},
+					data: []byte(srcData),
+				},
+			},
+		}
+
+		cfg := &config.Config{
+			ServerPort:  8080,
+			ExternalURL: "http://proxy.test",
+			StreamProxyOpt: config.StreamProxyOpt{
+				Enable: true,
+			},
+			M3UOpt: config.M3UOpt{
+				MediaPlaylistFilters: []config.ArrayMixOpt{
+					{MixOpt: config.MixOpt{SourceName: "proxy_src"}},
+				},
+			},
+		}
+
+		result, err := MixM3UMediaPlayList(cfg, sourcer)
+		assert.NoError(t, err)
+		assert.Len(t, result.Tracks, 1)
+		assert.Contains(t, result.Tracks[0].URI, "http://proxy.test/v1/stream/proxy?url=http%3A%2F%2Fupstream.com%2Flive.m3u8&source=proxy_src")
+	})
 }

@@ -82,10 +82,17 @@ func (s *Source) Name() string {
 	return s.config.Name
 }
 
+func (s *Source) Priority() int {
+	return s.config.Priority
+}
+
+func (s *Source) Config() config.Source {
+	return s.config
+}
+
 func (s *Source) GetSource(_ string) ([]byte, error) {
 	return s.data, nil
 }
-
 func NewSourceManager(sources []config.Source, logger *slog.Logger) *SourceManager {
 	cfg := &config.Config{Sources: sources}
 	cfg.Fixture()

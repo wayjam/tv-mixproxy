@@ -16,6 +16,7 @@ type Config struct {
 	EPGMappingOpt      EPGMappingOpt      `mapstructure:"epg_mapping"`           // 台标与 EPG 绑定配置
 	PersistenceOpt     PersistenceOpt     `mapstructure:"persistence"`           // 磁盘快照持久化兜底配置
 	SecurityOpt        SecurityOpt        `mapstructure:"security"`              // 安全与鉴权配置
+	StreamProxyOpt     StreamProxyOpt     `mapstructure:"stream_proxy"`          // 视频流代理配置
 	Sources            []Source           `mapstructure:"sources"`               // 源配置
 	TvBoxSingleRepoOpt TvBoxSingleRepoOpt `mapstructure:"tvbox_single_repo_opt"` // TvBox单仓源配置
 	TvBoxMultiRepoOpt  TvBoxMultiRepoOpt  `mapstructure:"tvbox_multi_repo_opt"`  // TvBox多仓源配置
@@ -107,6 +108,14 @@ func (c *Config) Fixture() {
 	if c.Log.MaxAgeDays <= 0 {
 		c.Log.MaxAgeDays = 28
 	}
+
+	// Set default StreamProxy options
+	if c.StreamProxyOpt.Timeout <= 0 {
+		c.StreamProxyOpt.Timeout = 15
+	}
+	if c.M3UOpt.MergeMode == "" {
+		c.M3UOpt.MergeMode = "rename"
+	}
 }
 
 func (c *Config) fillFallbackSourceName(opt *MixOpt) {
@@ -170,11 +179,13 @@ type EPGOpt struct {
 }
 
 type M3UOpt struct {
-	Disable               bool          `mapstructure:"disable"`                 // 是否禁用M3U源
-	MediaPlaylistFallback MixOpt        `mapstructure:"media_playlist_fallback"` // 媒体播放列表降级配置
-	MediaPlaylistFilters  []ArrayMixOpt `mapstructure:"media_playlist_filters"`  // 媒体播放列表过滤配置
-	EPGURLs               []string      `mapstructure:"epg_urls"`                // 自定义注入的 EPG URL 列表（支持多个）
-	DefaultGroup          string        `mapstructure:"default_group"`           // 默认分组名称，未分组频道自动填充
+	Disable                bool          `mapstructure:"disable"`                  // 是否禁用M3U源
+	MediaPlaylistFallback  MixOpt        `mapstructure:"media_playlist_fallback"`  // 媒体播放列表降级配置
+	MediaPlaylistFilters   []ArrayMixOpt `mapstructure:"media_playlist_filters"`   // 媒体播放列表过滤配置
+	EPGURLs                []string      `mapstructure:"epg_urls"`                 // 自定义注入的 EPG URL 列表（支持多个）
+	DefaultGroup           string        `mapstructure:"default_group"`            // 默认分组名称，未分组频道自动填充
+	MergeDuplicateChannels bool          `mapstructure:"merge_duplicate_channels"` // 是否开启同名频道多线路合并
+	MergeMode              string        `mapstructure:"merge_mode"`               // 合并模式: "rename"（线路1/线路2，默认）或 "dollar"（在支持的环境按多URL合并）
 	// MasterPlaylistFilters []ArrayMixOpt `mapstructure:"master_playlist_filters"` // 主播放列表过滤配置
 }
 
@@ -192,13 +203,15 @@ type ArrayMixOpt struct {
 }
 
 type Source struct {
-	Name     string            `mapstructure:"name"`     // 源名称, 唯一标识， 用来标识用在配置中
-	URL      string            `mapstructure:"url"`      // 源地址
-	Type     SourceType        `mapstructure:"type"`     // 源类型
-	Interval int               `mapstructure:"interval"` // 源更新频率，单位为秒, 默认 60 秒
-	Timeout  int               `mapstructure:"timeout"`  // 单源覆盖超时时间，秒
-	Headers  map[string]string `mapstructure:"headers"`  // 单源覆盖请求头
-	ProxyURL string            `mapstructure:"proxy_url"` // 单源覆盖代理
+	Name        string            `mapstructure:"name"`         // 源名称, 唯一标识， 用来标识用在配置中
+	URL         string            `mapstructure:"url"`          // 源地址
+	Type        SourceType        `mapstructure:"type"`         // 源类型
+	Interval    int               `mapstructure:"interval"`     // 源更新频率，单位为秒, 默认 60 秒
+	Timeout     int               `mapstructure:"timeout"`      // 单源覆盖超时时间，秒
+	Headers     map[string]string `mapstructure:"headers"`      // 单源覆盖请求头
+	ProxyURL    string            `mapstructure:"proxy_url"`     // 单源覆盖代理
+	Priority    int               `mapstructure:"priority"`     // 源优先级，数值越高越优先（多线路合并时排在前面）
+	ProxyStream bool              `mapstructure:"proxy_stream"` // 是否对该源的所有流强制经过流代理
 }
 
 type CacheOpt struct {
@@ -250,6 +263,13 @@ func (s SecurityOpt) GetSecret() string {
 	}
 	return s.APISecret
 }
+type StreamProxyOpt struct {
+	Enable       bool     `mapstructure:"enable"`        // 是否启用视频流代理
+	AutoProxy    bool     `mapstructure:"auto_proxy"`    // 是否自动将配置了 headers 的源重写为代理地址
+	AllowedHosts []string `mapstructure:"allowed_hosts"` // 允许代理的目标主机名单（空表示不限制）
+	Timeout      int      `mapstructure:"timeout"`       // 流拉取超时（秒），默认 15
+}
+
 
 type SourceType string
 

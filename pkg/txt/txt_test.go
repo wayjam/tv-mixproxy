@@ -65,3 +65,25 @@ CCTV-1,http://live1.ts$http://live2.ts
 	assert.NoError(t, err)
 	assert.True(t, strings.Contains(string(out), "CCTV-1,http://live1.ts$http://live2.ts"))
 }
+
+func TestFromM3UWithLineSuffixes(t *testing.T) {
+	raw := `
+央视频道,#genre#
+CCTV-1,http://line1.ts
+CCTV-1,http://line2.ts
+`
+	pl, err := Unmarshal([]byte(raw))
+	assert.NoError(t, err)
+	m3uPl := pl.ToM3U()
+	m3uPl.Tracks[0].Name = "CCTV-1 (线路1)"
+	m3uPl.Tracks[1].Name = "CCTV-1 (线路2)"
+
+	txtPl := FromM3U(m3uPl)
+	assert.Len(t, txtPl.Channels, 1)
+	assert.Equal(t, "CCTV-1", txtPl.Channels[0].Name)
+	assert.Equal(t, []string{"http://line1.ts", "http://line2.ts"}, txtPl.Channels[0].URLs)
+
+	marshaled, err := txtPl.Marshal()
+	assert.NoError(t, err)
+	assert.Contains(t, string(marshaled), "CCTV-1,http://line1.ts$http://line2.ts")
+}

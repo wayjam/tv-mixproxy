@@ -85,7 +85,7 @@ func (s *server) SetupRoutes() {
 	app.Get("/api/diyp", NewDIYPHandler(s.cfg, s.sourceManager, s.cacheManager))
 	app.Get("/api/diyp/", NewDIYPHandler(s.cfg, s.sourceManager, s.cacheManager))
 	app.Get("/refresh_source", RefershSrouceHandler(s.cfg, s.sourceManager, s.cacheManager))
-
+	app.Get("/stream/proxy", NewStreamProxyHandler(s.cfg, s.sourceManager))
 	v1 := app.Group("/v1")
 	v1.Get("/tvbox/repo", NewRepoHandler(s.cfg, s.sourceManager, s.cacheManager))
 	v1.Get("/tvbox/multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager, s.cacheManager))
@@ -95,6 +95,7 @@ func (s *server) SetupRoutes() {
 	v1.Get("/m3u/media_playlist", NewM3UMediaHandler(s.cfg, s.sourceManager, s.cacheManager))
 	v1.Get("/live.txt", NewLiveTXTHandler(s.cfg, s.sourceManager, s.cacheManager))
 	v1.Get("/txt/live", NewLiveTXTHandler(s.cfg, s.sourceManager, s.cacheManager))
+	v1.Get("/stream/proxy", NewStreamProxyHandler(s.cfg, s.sourceManager))
 }
 func (s *server) App() *fiber.App {
 	return s.app

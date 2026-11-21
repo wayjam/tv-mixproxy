@@ -61,6 +61,18 @@ tvbox_single_repo_opt:
 - 上游源成功抓取后自动写入本地快照目录。
 - 当上游源超时、网络波动或故障时，自动降级读取本地磁盘历史快照（Stale-on-error），杜绝电视端黑屏。
 
+11. 同名频道多线路合并（Multi-line Aggregation）：
+
+- 当聚合多个包含相同频道的源时，开启 `merge_duplicate_channels: true` 自动合并同名频道。
+- 支持设置源优先级权重（`priority`），高质量源自动排在前面。
+- M3U 默认采用 `merge_mode: "rename"` 生成清晰的线路后缀（`线路1`、`线路2`），电视端选台一目了然且自动共享台标与 EPG；TXT / DIYP 格式自动用 `$` 连接多线路。
+
+12. 视频流防盗链代理（Stream Anti-hotlink Proxy）：
+
+- 针对必须携带 `Referer`、`User-Agent` 等自定义防盗链请求头的视频流，提供 `/v1/stream/proxy` 透明代理接口。
+- 支持自动重写（`auto_proxy: true`）或源级指定（`proxy_stream: true`）。
+- 针对 M3U8 二级切片自动递归重写代理地址，TS 切片采用 SendStream 零积压流式中转。
+
 ## Log
 
 > Log Level 参考：<https://docs.gofiber.io/api/log/>
@@ -102,6 +114,13 @@ persistence:
   dir: "./data/cache"     # 快照保存目录
   stale_on_error: true    # 上游抓取失败时降级使用历史快照
 
+# 视频流代理配置（防盗链与 CORS 转发）
+stream_proxy:
+  enable: true            # 是否启用流代理
+  auto_proxy: true        # 配置了 headers 的源自动重写为代理地址
+  timeout: 15             # 流拉取超时（秒）
+  allowed_hosts: []       # 允许代理的目标主机名单（空表示不限制）
+
 # 安全与鉴权
 security:
   secret: "your_secret_key" # 刷新源密钥，支持请求头或 ?token= 查询参数
@@ -131,13 +150,15 @@ sources:
     type: "tvbox_single"  # 源类型
     interval: 3600  # 更新间隔，单位为秒, 默认 60s, -1 表示不更新
     timeout: 10     # 单源覆盖超时
+    priority: 50    # 优先级权重，多线路合并时越高越靠前
     headers:        # 单源特有防盗链头
       Referer: "https://example.com"
+    proxy_stream: true # 强制此源的所有视频流经过本地代理转发
   - name: "live_source"
     url: "https://example.com/live.m3u"
     type: "m3u"
     interval: 1800
-
+    priority: 100   # 优先线路
 tvbox_single_repo_opt: # 单仓配置
   disable: false
   spider:
@@ -167,6 +188,8 @@ epg_opt:
 m3u_opt:
   disable: false
   default_group: "其它频道" # 未分组频道的默认分组
+  merge_duplicate_channels: true # 开启同名频道多线路合并
+  merge_mode: "rename" # rename: 标注 (线路1)/(线路2); dollar: $连接
   epg_urls: # 自定义注入的 EPG URL（支持注入多个）
     - "{external_url}/v1/epg.xml"
   media_playlist_filters:

@@ -3,10 +3,13 @@ package txt
 import (
 	"bufio"
 	"bytes"
+	"regexp"
 	"strings"
 
 	"github.com/wayjam/tv-mixproxy/pkg/m3u"
 )
+
+var lineSuffixRegex = regexp.MustCompile(`\s*\(线路\d+\)$`)
 
 // Channel 表示一个 TXT 直播源中的频道
 type Channel struct {
@@ -161,30 +164,47 @@ func FromM3U(p *m3u.Playlist) *Playlist {
 		}
 		if name == "" {
 			name = "未命名频道"
+		} else {
+			name = lineSuffixRegex.ReplaceAllString(name, "")
 		}
+
 		uri := track.URI
 		if uri == "" {
 			continue
 		}
 
+		incomingURLs := strings.Split(uri, "$")
+		var validIncoming []string
+		for _, u := range incomingURLs {
+			u = strings.TrimSpace(u)
+			if u != "" {
+				validIncoming = append(validIncoming, u)
+			}
+		}
+		if len(validIncoming) == 0 {
+			continue
+		}
+
 		key := grp + "\x00" + name
 		if idx, exists := channelIndex[key]; exists {
-			alreadyExists := false
-			for _, existingURL := range playlist.Channels[idx].URLs {
-				if existingURL == uri {
-					alreadyExists = true
-					break
+			for _, newURL := range validIncoming {
+				alreadyExists := false
+				for _, existingURL := range playlist.Channels[idx].URLs {
+					if existingURL == newURL {
+						alreadyExists = true
+						break
+					}
 				}
-			}
-			if !alreadyExists {
-				playlist.Channels[idx].URLs = append(playlist.Channels[idx].URLs, uri)
+				if !alreadyExists {
+					playlist.Channels[idx].URLs = append(playlist.Channels[idx].URLs, newURL)
+				}
 			}
 		} else {
 			channelIndex[key] = len(playlist.Channels)
 			playlist.Channels = append(playlist.Channels, Channel{
 				Group: grp,
 				Name:  name,
-				URLs:  []string{uri},
+				URLs:  validIncoming,
 			})
 		}
 	}

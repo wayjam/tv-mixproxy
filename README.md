@@ -16,6 +16,8 @@ TV MixProxy 是一个用于混合不同 电视接口 并提供服务的工具。
 - 支持 TXT / DIYP 纯文本直播源格式双向互转与统一聚合（`/v1/live.txt`）
 - **频道名称智能清洗引擎**：正则剥离 `[IPv6]`、`[1080P]`、`4K`、`高清` 等修饰标签，央视与卫视别名自动规范对齐
 - **高清台标与 EPG 自动绑定**：缺失 `tvg-logo` 和 `tvg-id` 时自动根据规范频道名匹配注入
+- **同名频道多线路智能聚合**：聚合多个源时自动合并同名频道，依据源优先级权重排序，M3U 输出清晰线路后缀（`线路1`、`线路2`），TXT / DIYP 自动合并为 `URL1$URL2`
+- **视频流防盗链代理转发**：透明中转受防盗链（`Referer`、`User-Agent`、CORS）限制的视频流，M3U8 二级切片自动递归重写代理，TS 切片零积压流式转发
 - **磁盘持久化快照与故障降级（Stale-While-Revalidate）**：上游超时或不可用时自动降级使用本地磁盘历史快照，杜绝电视黑屏
 - **可配置缓存策略与防 OOM 内存保护**：支持 LRU 淘汰无界动态 DIYP 请求、保护核心 M3U/EPG 条目常驻（Pinned），严格限制内存与条目上限
 - **全局与单源网络定制**：支持自定义超时、失败重试、HTTP/SOCKS5 代理及防盗链请求头
@@ -56,6 +58,7 @@ ghcr.io/tv-mixproxy/tv-mixproxy:latest
     - 响应格式：`{"channel_name":"CCTV1","date":"2026-11-21","epg_data":[{"title":"新闻","start":"08:00","end":"09:00"}]}`
 - `/v1/m3u/media_playlist`: 获取混合后的 M3U 媒体播放列表（自动关联 `x-tvg-url`，规范化标签与属性）
 - `/v1/live.txt` 或 `/live.txt`: 获取 TXT / DIYP 文本直播源格式（`分组,#genre#` 与 `频道名,URL`）
+- `/v1/stream/proxy`: 视频流透明代理转发（支持 M3U8 二级切片递归重写、注入自定义防盗链请求头与 TS 流式转发）
 - `/refresh_source`: 触发源主动刷新与缓存清理（需提供 `CRON_SECRET` 或 `TV_MIXPROXY_SECRET` 鉴权）
 ## 配置说明
 

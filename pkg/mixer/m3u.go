@@ -3,6 +3,7 @@ package mixer
 import (
 	"bytes"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/wayjam/tv-mixproxy/config"
@@ -35,11 +36,22 @@ func MixM3UMediaPlayList(
 			result.Version = playlist.Version
 		}
 	}
+	var candidates []TrackCandidate
+	cleanEngine := cleaner.NewEngine(cfg.CleanerOpt, cfg.EPGMappingOpt)
 
 	for _, filter := range cfg.M3UOpt.MediaPlaylistFilters {
 		source, err := sourcer.GetSource(filter.SourceName)
 		if err != nil {
 			return nil, fmt.Errorf("get source %s: %w", filter.SourceName, err)
+		}
+
+		priority := 0
+		proxyStream := false
+		var headers map[string]string
+		if source != nil {
+			priority = source.Priority()
+			proxyStream = source.config.ProxyStream
+			headers = source.config.Headers
 		}
 
 		var playlist *m3u.Playlist
@@ -62,6 +74,8 @@ func MixM3UMediaPlayList(
 
 		includeRegex := compileRegex(filter.Include)
 		excludeRegex := compileRegex(filter.Exclude)
+
+		shouldProxy := cfg.StreamProxyOpt.Enable && (proxyStream || (cfg.StreamProxyOpt.AutoProxy && len(headers) > 0))
 
 		for i := range playlist.Tracks {
 			track := playlist.Tracks[i]
@@ -89,7 +103,27 @@ func MixM3UMediaPlayList(
 				continue
 			}
 
-			result.Tracks = append(result.Tracks, track)
+			// 清洗频道名称与标签
+			cleanEngine.ProcessTrack(&track)
+			if cfg.M3UOpt.DefaultGroup != "" && track.GetTag("group-title") == "" {
+				track.SetTag("group-title", cfg.M3UOpt.DefaultGroup)
+			}
+
+			// 若开启流代理或需要防盗链，重写流地址为本地代理
+			if shouldProxy && track.URI != "" {
+				track.URI = fmt.Sprintf("%s/v1/stream/proxy?url=%s&source=%s",
+					getExternalURL(cfg),
+					url.QueryEscape(track.URI),
+					url.QueryEscape(filter.SourceName),
+				)
+			}
+
+			candidates = append(candidates, TrackCandidate{
+				Track:         track,
+				Priority:      priority,
+				SourceName:    filter.SourceName,
+				OriginalIndex: len(candidates),
+			})
 		}
 
 		for i := range playlist.VariantStreams {
@@ -102,15 +136,10 @@ func MixM3UMediaPlayList(
 			result.VariantStreams = append(result.VariantStreams, variant)
 		}
 	}
-	// Process tracks with cleaner, EPG/logo mapping, and default group
-	cleanEngine := cleaner.NewEngine(cfg.CleanerOpt, cfg.EPGMappingOpt)
-	for i := range result.Tracks {
-		cleanEngine.ProcessTrack(&result.Tracks[i])
-		if cfg.M3UOpt.DefaultGroup != "" && result.Tracks[i].GetTag("group-title") == "" {
-			result.Tracks[i].SetTag("group-title", cfg.M3UOpt.DefaultGroup)
-		}
-	}
 
+	// 执行同名聚合与多线路合并
+	aggregator := NewAggregator(cfg.M3UOpt)
+	result.Tracks = aggregator.Aggregate(candidates)
 	// Process EPG URLs injection
 	if len(cfg.M3UOpt.EPGURLs) > 0 {
 		var resolvedEPGs []string
