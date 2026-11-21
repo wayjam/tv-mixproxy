@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,16 +40,32 @@ type SourceManager struct {
 type Source struct {
 	config     config.Source
 	lastUpdate time.Time
-	data       []byte // Change this to []byte
+	data       []byte
 	lastError  time.Time
 	errorCount int
-	refreshing bool // 添加标志位
+	version    int64
+	refreshing bool
+	refreshCh  chan struct{}
+	mu         sync.RWMutex
 }
 
 func (s *Source) Data() []byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.data
 }
 
+func (s *Source) Version() int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.version
+}
+
+func (s *Source) LastUpdate() time.Time {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.lastUpdate
+}
 func (s *Source) Type() config.SourceType {
 	return s.config.Type
 }
@@ -147,9 +165,13 @@ func (sm *SourceManager) refreshSource(name string) error {
 		return fmt.Errorf("source not found: %s", name)
 	}
 
-	// 如果已经在刷新中，直接返回
+	// 如果已经在刷新中，等待正在进行的刷新完成，而不是直接返回空数据
 	if source.refreshing {
+		ch := source.refreshCh
 		sm.mu.Unlock()
+		if ch != nil {
+			<-ch
+		}
 		return nil
 	}
 
@@ -163,12 +185,16 @@ func (sm *SourceManager) refreshSource(name string) error {
 	}
 
 	source.refreshing = true
+	source.refreshCh = make(chan struct{})
 	sm.mu.Unlock()
 
-	// 确保在函数结束时清除刷新标志
 	defer func() {
 		sm.mu.Lock()
 		source.refreshing = false
+		if source.refreshCh != nil {
+			close(source.refreshCh)
+			source.refreshCh = nil
+		}
 		sm.mu.Unlock()
 	}()
 
@@ -180,18 +206,14 @@ func (sm *SourceManager) refreshSource(name string) error {
 	}()
 
 	switch source.Type() {
-	case config.SourceTypeTvBoxSingle:
+	case config.SourceTypeTvBoxSingle, config.SourceTypeTvBoxMulti:
 		data, err = config.LoadTvBoxData(source.config.URL)
-	case config.SourceTypeTvBoxMulti:
-		data, err = config.LoadTvBoxData(source.config.URL)
-	case config.SourceTypeEPG:
-		data, err = config.FetchData(source.config.URL)
-	case config.SourceTypeM3U:
+	case config.SourceTypeEPG, config.SourceTypeM3U, config.SourceTypeTXT, config.SourceTypeDIYP:
 		data, err = config.FetchData(source.config.URL)
 	}
 
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
+	source.mu.Lock()
+	defer source.mu.Unlock()
 
 	if err != nil {
 		source.lastError = time.Now()
@@ -203,7 +225,38 @@ func (sm *SourceManager) refreshSource(name string) error {
 	source.lastUpdate = time.Now()
 	source.lastError = time.Time{}
 	source.errorCount = 0
+	source.version++
 	return nil
+}
+
+func (sm *SourceManager) GetFingerprint(names ...string) string {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	var b strings.Builder
+	if len(names) == 0 {
+		keys := make([]string, 0, len(sm.sources))
+		for k := range sm.sources {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, name := range keys {
+			s := sm.sources[name]
+			s.mu.RLock()
+			b.WriteString(fmt.Sprintf("%s:%d:%d;", name, s.version, s.lastUpdate.UnixNano()))
+			s.mu.RUnlock()
+		}
+		return b.String()
+	}
+
+	for _, name := range names {
+		if s, ok := sm.sources[name]; ok {
+			s.mu.RLock()
+			b.WriteString(fmt.Sprintf("%s:%d:%d;", name, s.version, s.lastUpdate.UnixNano()))
+			s.mu.RUnlock()
+		}
+	}
+	return b.String()
 }
 
 func (sm *SourceManager) Close() {

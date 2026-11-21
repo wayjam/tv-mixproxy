@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -54,10 +55,10 @@ func TestUnmarshalPlaylist(t *testing.T) {
 		track := playlist.Tracks[len(playlist.Tracks)-2]
 
 		expectedTags := map[string]string{
-			"TVG-ID":      "Channel1",
-			"TVG-NAME":    "Channel 1",
-			"TVG-LOGO":    "http://example.com/channel1.png",
-			"GROUP-TITLE": "Entertainment",
+			"tvg-id":      "Channel1",
+			"tvg-name":    "Channel 1",
+			"tvg-logo":    "http://example.com/channel1.png",
+			"group-title": "Entertainment",
 		}
 
 		if track.Name != "Channel 1" {
@@ -111,11 +112,59 @@ func TestMarshal(t *testing.T) {
 
 	// 验证生成的内容
 	expected := `#EXTM3U
-#EXTINF:10.000000 tvg-name="Test Channel" group-title="Test Group", Test Channel
+#EXTINF:10 tvg-name="Test Channel" group-title="Test Group",Test Channel
 http://example.com/test.ts
 `
 
 	if string(data) != expected {
 		t.Errorf("Marshalled content doesn't match expected.\nExpected:\n%s\nGot:\n%s", expected, string(data))
+	}
+}
+
+func TestIPTVTrackWithCommasAndDirectives(t *testing.T) {
+	raw := `#EXTM3U x-tvg-url="https://epg.example.com/epg.xml.gz"
+#EXTINF:-1 tvg-id="cctv1" tvg-name="CCTV-1, HD" group-title="News, Sports",CCTV-1, 综合
+#EXTVLCOPT:http-user-agent=TestUA
+#KODIPROP:inputstream.adaptive.manifest_type=mpd
+http://example.com/live/cctv1.m3u8
+`
+	var playlist Playlist
+	err := Unmarshal([]byte(raw), &playlist)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if len(playlist.Tracks) != 1 {
+		t.Fatalf("expected 1 track, got %d", len(playlist.Tracks))
+	}
+	track := playlist.Tracks[0]
+	if track.Name != "CCTV-1, 综合" {
+		t.Errorf("expected title 'CCTV-1, 综合', got %q", track.Name)
+	}
+	if track.Duration != -1 {
+		t.Errorf("expected duration -1, got %v", track.Duration)
+	}
+	if track.GetTag("tvg-name") != "CCTV-1, HD" {
+		t.Errorf("expected tvg-name 'CCTV-1, HD', got %q", track.GetTag("tvg-name"))
+	}
+	if track.GetTag("group-title") != "News, Sports" {
+		t.Errorf("expected group-title 'News, Sports', got %q", track.GetTag("group-title"))
+	}
+	if len(track.Directives) != 2 {
+		t.Errorf("expected 2 directives, got %d", len(track.Directives))
+	}
+	if playlist.GetTag("x-tvg-url") != "https://epg.example.com/epg.xml.gz" {
+		t.Errorf("expected x-tvg-url, got %q", playlist.GetTag("x-tvg-url"))
+	}
+
+	marshaled, err := Marshal(&playlist)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+	if !strings.Contains(string(marshaled), "#EXTINF:-1 ") {
+		t.Errorf("expected -1 duration in output, got:\n%s", string(marshaled))
+	}
+	if !strings.Contains(string(marshaled), ",CCTV-1, 综合\n") {
+		t.Errorf("expected ',CCTV-1, 综合' in output, got:\n%s", string(marshaled))
 	}
 }

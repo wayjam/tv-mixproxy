@@ -232,7 +232,7 @@ func TestMixMultiRepo(t *testing.T) {
 
 	assert.Len(t, result.Repos, 4) // 3 from multi_source + 1 single repo
 	assert.Equal(t, "Tv MixProxy", result.Repos[0].Name)
-	assert.Contains(t, result.Repos[0].URL, "/tvbox_repo")
+	assert.Contains(t, result.Repos[0].URL, "/v1/tvbox/repo")
 	assert.Equal(t, "Repo 1", result.Repos[1].Name)
 	assert.Equal(t, "Repo 2", result.Repos[2].Name)
 	assert.Equal(t, "Repo 3", result.Repos[3].Name)
@@ -246,7 +246,7 @@ func TestMixMultiRepo(t *testing.T) {
 	assert.NotNil(t, filteredResult)
 	assert.Len(t, filteredResult.Repos, 2) // 1 filtered from multi_source + 1 single repo
 	assert.Equal(t, "Tv MixProxy", filteredResult.Repos[0].Name)
-	assert.Contains(t, filteredResult.Repos[0].URL, "/tvbox_repo")
+	assert.Contains(t, filteredResult.Repos[0].URL, "/v1/tvbox/repo")
 	assert.Equal(t, "Repo 1", filteredResult.Repos[1].Name)
 
 	// 添加新的测试用例，测试字段不存在的情况
@@ -261,4 +261,43 @@ func TestMixMultiRepo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Len(t, result.Repos, 2) // 1 from single repo + 1 from existing multi_source
+}
+
+func TestMixTvBoxRepo_InternalM3U(t *testing.T) {
+	mockSourcer := &MockSourcer{
+		sources: map[string]*Source{
+			"source1": {
+				config: config.Source{URL: "https://example.com/repo/config.json"},
+				data:   []byte(`{"spider":"./spider.jar;md5;123456","lives":[{"name":"external_live","url":"./live.m3u"}]}`),
+			},
+		},
+	}
+
+	cfg := &config.Config{
+		ServerPort:  8080,
+		ExternalURL: "http://proxy.example.com",
+		TvBoxSingleRepoOpt: config.TvBoxSingleRepoOpt{
+			Spider: config.MixOpt{SourceName: "source1", Field: "spider"},
+			Lives: []config.ArrayMixOpt{
+				{MixOpt: config.MixOpt{SourceName: "internal/m3u"}},
+				{MixOpt: config.MixOpt{SourceName: "source1", Field: "lives"}},
+			},
+		},
+		M3UOpt: config.M3UOpt{Disable: false},
+		EPGOpt: config.EPGOpt{Disable: false},
+	}
+
+	result, err := MixTvBoxRepo(cfg, mockSourcer)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://example.com/repo/spider.jar;md5;123456", result.Spider)
+	assert.Len(t, result.Lives, 2)
+
+	// Internal M3U live
+	assert.Equal(t, "TV MixProxy", result.Lives[0].Name)
+	assert.Equal(t, "http://proxy.example.com/v1/m3u/media_playlist", result.Lives[0].URL)
+	assert.Equal(t, "http://proxy.example.com/v1/epg.xml", result.Lives[0].EPG)
+
+	// Resolved relative live
+	assert.Equal(t, "external_live", result.Lives[1].Name)
+	assert.Equal(t, "https://example.com/repo/live.m3u", result.Lives[1].URL)
 }

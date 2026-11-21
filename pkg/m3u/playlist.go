@@ -24,6 +24,30 @@ type Playlist struct {
 	VariantStreams []VariantStream
 	Version        int
 	Tags           []Tag
+
+	currentTrack   *Track
+	currentVariant *VariantStream
+}
+
+func (p *Playlist) GetTag(name string) string {
+	nameLower := strings.ToLower(name)
+	for _, tag := range p.Tags {
+		if strings.ToLower(tag.Name) == nameLower {
+			return tag.Value
+		}
+	}
+	return ""
+}
+
+func (p *Playlist) SetTag(name, value string) {
+	nameLower := strings.ToLower(name)
+	for i := range p.Tags {
+		if strings.ToLower(p.Tags[i].Name) == nameLower {
+			p.Tags[i].Value = value
+			return
+		}
+	}
+	p.Tags = append(p.Tags, Tag{Name: nameLower, Value: value})
 }
 
 // A Tag is a key/value pair
@@ -51,11 +75,7 @@ func (p *Playlist) marshalM3U(writer io.Writer) error {
 
 	for i := range p.Tags {
 		tag := &p.Tags[i]
-		sep := " "
-		if i == len(p.Tags)-1 && i != 0 {
-			sep = ""
-		}
-		writer.Write([]byte(fmt.Sprintf("%s%s=%q", sep, tag.Name, tag.Value)))
+		writer.Write([]byte(fmt.Sprintf(" %s=%q", tag.Name, tag.Value)))
 	}
 
 	writer.Write([]byte("\n"))
@@ -98,57 +118,81 @@ func (p *Playlist) unmarshalScanner(scanner *bufio.Scanner) error {
 }
 
 func (p *Playlist) parseLine(line string) error {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return nil
+	}
 	switch {
-	case strings.HasPrefix(line, "#EXTM3U"):
-		p.Tags = p.parseTag(line[7:])
-	case strings.HasPrefix(line, "#EXTINF:"):
-		track, err := parseTrack(line[8:])
+	case strings.HasPrefix(trimmed, "#EXTM3U"):
+		p.Tags = append(p.Tags, p.parseTag(trimmed[7:])...)
+	case strings.HasPrefix(trimmed, "#EXTINF:"):
+		track, err := parseTrack(trimmed[8:])
 		if err != nil {
 			return err
 		}
 		p.Tracks = append(p.Tracks, *track)
-	case strings.HasPrefix(line, "#EXT-X-STREAM-INF:"):
-		stream, err := parseVariantStream(line[18:])
+		p.currentTrack = &p.Tracks[len(p.Tracks)-1]
+		p.currentVariant = nil
+	case strings.HasPrefix(trimmed, "#EXT-X-STREAM-INF:"):
+		stream, err := parseVariantStream(trimmed[18:])
 		if err != nil {
 			return err
 		}
 		p.VariantStreams = append(p.VariantStreams, *stream)
-	case strings.HasPrefix(line, "#EXT-X-VERSION:"):
-		version, err := strconv.Atoi(strings.TrimSpace(line[15:]))
+		p.currentVariant = &p.VariantStreams[len(p.VariantStreams)-1]
+		p.currentTrack = nil
+	case strings.HasPrefix(trimmed, "#EXT-X-VERSION:"):
+		version, err := strconv.Atoi(strings.TrimSpace(trimmed[15:]))
 		if err != nil {
 			return err
 		}
 		p.Version = version
-	case strings.HasPrefix(line, "#") || line == "":
+	case strings.HasPrefix(trimmed, "#EXTGRP:"):
+		grp := strings.TrimSpace(trimmed[8:])
+		if p.currentTrack != nil {
+			p.currentTrack.Directives = append(p.currentTrack.Directives, line)
+			if p.currentTrack.GetTag("group-title") == "" {
+				p.currentTrack.SetTag("group-title", grp)
+			}
+		}
+	case strings.HasPrefix(trimmed, "#EXTVLCOPT:") || strings.HasPrefix(trimmed, "#KODIPROP:"):
+		if p.currentTrack != nil {
+			p.currentTrack.Directives = append(p.currentTrack.Directives, line)
+		}
+	case strings.HasPrefix(trimmed, "#"):
+		if p.currentTrack != nil && !strings.HasPrefix(trimmed, "#EXT-X-") {
+			p.currentTrack.Directives = append(p.currentTrack.Directives, line)
+		}
 		return nil
 	default:
-		return p.handleURI(line)
+		return p.handleURI(trimmed)
 	}
 	return nil
 }
 
 func (p *Playlist) handleURI(line string) error {
-	if len(p.Tracks) == 0 && len(p.VariantStreams) == 0 {
-		return errors.New("URI provided for playlist with no tracks or streams")
+	uri := strings.TrimSpace(line)
+	if p.currentTrack != nil {
+		p.currentTrack.URI = uri
+		p.currentTrack = nil
+		return nil
 	}
-
-	uri := strings.Trim(line, " ")
-	if len(p.VariantStreams) > 0 {
-		p.VariantStreams[len(p.VariantStreams)-1].URI = uri
-	} else {
+	if p.currentVariant != nil {
+		p.currentVariant.URI = uri
+		p.currentVariant = nil
+		return nil
+	}
+	if len(p.Tracks) > 0 && p.Tracks[len(p.Tracks)-1].URI == "" {
 		p.Tracks[len(p.Tracks)-1].URI = uri
+		return nil
 	}
-	return nil
+	if len(p.VariantStreams) > 0 && p.VariantStreams[len(p.VariantStreams)-1].URI == "" {
+		p.VariantStreams[len(p.VariantStreams)-1].URI = uri
+		return nil
+	}
+	return errors.New("URI provided for playlist with no active tracks or streams")
 }
 
 func (p *Playlist) parseTag(line string) []Tag {
-	tags := make([]Tag, 0)
-	for k, v := range DecodeAttributeList(line) {
-		tag := Tag{
-			Name:  strings.TrimSpace(strings.ToUpper(k)),
-			Value: v,
-		}
-		tags = append(tags, tag)
-	}
-	return tags
+	return parseAttributes(line)
 }

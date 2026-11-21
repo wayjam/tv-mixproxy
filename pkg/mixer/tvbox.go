@@ -3,6 +3,8 @@ package mixer
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -23,7 +25,9 @@ func MixTvBoxRepo(
 	singleRepoOpt := cfg.TvBoxSingleRepoOpt
 
 	// 混合 spider 字段
-	if !singleRepoOpt.Spider.Disabled && singleRepoOpt.Spider.SourceName != "" {
+	if singleRepoOpt.Spider.Disabled {
+		result.Spider = ""
+	} else if singleRepoOpt.Spider.SourceName != "" {
 		spider, source, err := mixFieldAndGetSource(singleRepoOpt.Spider, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing spider: %w", err)
@@ -82,6 +86,27 @@ func MixTvBoxRepo(
 
 	// Mix lives array
 	for _, liveOpt := range singleRepoOpt.Lives {
+		if liveOpt.Disabled {
+			continue
+		}
+		if liveOpt.SourceName == "internal/m3u" {
+			if !cfg.M3UOpt.Disable {
+				epgURL := ""
+				if !cfg.EPGOpt.Disable {
+					epgURL = getExternalURL(cfg) + "/v1/epg.xml"
+				}
+				result.Lives = append(result.Lives, config.TvBoxLive{
+					Name:       "TV MixProxy",
+					Type:       0,
+					URL:        getExternalURL(cfg) + "/v1/m3u/media_playlist",
+					PlayerType: 1,
+					EPG:        epgURL,
+					Logo:       getExternalURL(cfg) + "/logo",
+				})
+			}
+			continue
+		}
+
 		lives, source, err := mixArrayFieldAndGetSource[config.TvBoxLive](liveOpt, sourcer)
 		if err != nil {
 			return result, fmt.Errorf("mixing lives: %w", err)
@@ -252,7 +277,7 @@ func MixMultiRepo(
 	if multiRepoOpt.IncludeSingleRepo {
 		result.Repos = append(result.Repos, config.TvBoxRepoURLConfig{
 			Name: "Tv MixProxy",
-			URL:  getExternalURL(cfg) + "/v1/tvbox_repo",
+			URL:  getExternalURL(cfg) + "/v1/tvbox/repo",
 		})
 	}
 
@@ -281,32 +306,74 @@ func getExternalURL(cfg *config.Config) (url string) {
 	return
 }
 
-// fullFillURL 将相对路径转换为绝对路径
-func fullFillURL(url string, source *Source) string {
-	if strings.HasPrefix(url, "./") {
-		baseURL := source.URL()
-		lastSlashIndex := strings.LastIndex(baseURL, "/")
-		if lastSlashIndex != -1 {
-			baseURL = baseURL[:lastSlashIndex+1]
-		}
-		url = baseURL + strings.TrimPrefix(url, "./")
+func isRelativePath(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	if strings.HasPrefix(raw, "./") || strings.HasPrefix(raw, "../") {
+		return true
+	}
+	if strings.HasPrefix(raw, "/") && !strings.HasPrefix(raw, "//") {
+		return true
+	}
+	return false
+}
+
+// fullFillURL 将相对路径转换为绝对路径，并保留 ;md5; 校验后缀
+func fullFillURL(rawURL string, source *Source) string {
+	if rawURL == "" || source == nil || source.URL() == "" {
+		return rawURL
 	}
 
-	return url
+	lower := strings.ToLower(rawURL)
+	if strings.HasPrefix(lower, "http://") ||
+		strings.HasPrefix(lower, "https://") ||
+		strings.HasPrefix(lower, "file://") ||
+		strings.HasPrefix(lower, "clan://") ||
+		strings.HasPrefix(lower, "tvbox://") {
+		return rawURL
+	}
+
+	parts := strings.Split(rawURL, ";")
+	relPath := parts[0]
+	md5Suffix := ""
+	if len(parts) > 1 {
+		md5Suffix = ";" + strings.Join(parts[1:], ";")
+	}
+
+	baseURLStr := source.URL()
+	if strings.HasPrefix(baseURLStr, "file://") {
+		basePath := strings.TrimPrefix(baseURLStr, "file://")
+		dir := filepath.Dir(basePath)
+		resolvedPath := filepath.Clean(filepath.Join(dir, relPath))
+		return "file://" + resolvedPath + md5Suffix
+	}
+
+	baseURL, err := url.Parse(baseURLStr)
+	if err != nil {
+		return rawURL
+	}
+
+	relURL, err := url.Parse(relPath)
+	if err != nil {
+		return rawURL
+	}
+
+	return baseURL.ResolveReference(relURL).String() + md5Suffix
 }
 
 func processSiteFields(item config.TvBoxSite, source *Source) config.TvBoxSite {
-	if strings.HasPrefix(item.API, "./") {
+	if isRelativePath(item.API) {
 		item.API = fullFillURL(item.API, source)
 	}
 
-	if strings.HasPrefix(item.Jar, "./") {
+	if item.Jar != "" && !strings.Contains(item.Jar, "://") {
 		item.Jar = fullFillURL(item.Jar, source)
 	}
 
 	switch ext := item.Ext.(type) {
 	case string:
-		if strings.HasPrefix(ext, "./") {
+		if isRelativePath(ext) {
 			item.Ext = fullFillURL(ext, source)
 		}
 	}
@@ -315,15 +382,21 @@ func processSiteFields(item config.TvBoxSite, source *Source) config.TvBoxSite {
 }
 
 func processLiveFields(item config.TvBoxLive, source *Source) config.TvBoxLive {
-	if strings.HasPrefix(item.URL, "./") {
+	if isRelativePath(item.URL) {
 		item.URL = fullFillURL(item.URL, source)
+	}
+	if isRelativePath(item.EPG) {
+		item.EPG = fullFillURL(item.EPG, source)
+	}
+	if isRelativePath(item.Logo) {
+		item.Logo = fullFillURL(item.Logo, source)
 	}
 
 	return item
 }
 
 func processMultiRepoFields(item config.TvBoxRepoURLConfig, source *Source) config.TvBoxRepoURLConfig {
-	if strings.HasPrefix(item.URL, "./") {
+	if isRelativePath(item.URL) {
 		item.URL = fullFillURL(item.URL, source)
 	}
 
@@ -331,14 +404,14 @@ func processMultiRepoFields(item config.TvBoxRepoURLConfig, source *Source) conf
 }
 
 func processDOHFields(item config.TvBoxDOH, source *Source) config.TvBoxDOH {
-	if strings.HasPrefix(item.URL, "./") {
+	if isRelativePath(item.URL) {
 		item.URL = fullFillURL(item.URL, source)
 	}
 	return item
 }
 
 func processParseFields(item config.TvBoxParse, source *Source) config.TvBoxParse {
-	if strings.HasPrefix(item.URL, "./") {
+	if isRelativePath(item.URL) {
 		item.URL = fullFillURL(item.URL, source)
 	}
 	return item

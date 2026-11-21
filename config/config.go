@@ -113,6 +113,8 @@ type EPGFilterType string
 const (
 	EPGFilterTypeChannelID    EPGFilterType = "channel_id"
 	EPGFilterTypeProgramTitle EPGFilterType = "program_title"
+	EPGFilterTypeChannelName  EPGFilterType = "channel_name"
+	EPGFilterTypeDisplayName  EPGFilterType = "display_name"
 )
 
 type EPGOpt struct {
@@ -157,6 +159,8 @@ const (
 	SourceTypeTvBoxMulti  SourceType = "tvbox_multi"  // tvbox多仓源
 	SourceTypeEPG         SourceType = "epg"          // epg源
 	SourceTypeM3U         SourceType = "m3u"          // m3u源
+	SourceTypeTXT         SourceType = "txt"          // txt直播源
+	SourceTypeDIYP        SourceType = "diyp"         // diyp直播源
 )
 
 func LoadServerConfig(cfgFile string) (*Config, error) {

@@ -39,24 +39,27 @@ func MixEPG(
 			sourceChannelMap[channel.ID] = channel
 		}
 
-		if filter.FilterBy == string(config.EPGFilterTypeChannelID) {
-			// 按频道ID过滤
-			filteredChannels := filterChannels(sourceEpg.Channel, filter)
-			for _, channel := range filteredChannels {
-				channelMap[channel.ID] = channel
-			}
+		switch filter.FilterBy {
+		case string(config.EPGFilterTypeProgramTitle):
 			filteredProgrammes := filterProgrammes(sourceEpg.Programme, filter)
-			mixedEPG.Programme = append(mixedEPG.Programme, filteredProgrammes...)
-		} else if filter.FilterBy == string(config.EPGFilterTypeProgramTitle) {
-			// 按节目标题过滤
-			filteredProgrammes := filterProgrammes(sourceEpg.Programme, filter)
-			// 收集匹配节目对应的频道
 			for _, programme := range filteredProgrammes {
 				if channel, exists := sourceChannelMap[programme.Channel]; exists {
 					channelMap[channel.ID] = channel
 				}
 			}
 			mixedEPG.Programme = append(mixedEPG.Programme, filteredProgrammes...)
+		default:
+			filteredChannels := filterChannels(sourceEpg.Channel, filter)
+			matchedChannelIDs := make(map[string]struct{}, len(filteredChannels))
+			for _, channel := range filteredChannels {
+				channelMap[channel.ID] = channel
+				matchedChannelIDs[channel.ID] = struct{}{}
+			}
+			for _, programme := range sourceEpg.Programme {
+				if _, ok := matchedChannelIDs[programme.Channel]; ok {
+					mixedEPG.Programme = append(mixedEPG.Programme, programme)
+				}
+			}
 		}
 	}
 
@@ -74,10 +77,22 @@ func filterChannels(channels []epg.Channel, filter config.ArrayMixOpt) []epg.Cha
 	excludeRegex := compileRegex(filter.Exclude)
 
 	for _, channel := range channels {
-		if filter.FilterBy == string(config.EPGFilterTypeChannelID) {
-			if matchFilter(channel.ID, includeRegex, excludeRegex) {
+		var target string
+		switch filter.FilterBy {
+		case string(config.EPGFilterTypeChannelName), string(config.EPGFilterTypeDisplayName):
+			target = channel.DisplayName()
+		case string(config.EPGFilterTypeChannelID):
+			target = channel.ID
+		default:
+			if matchFilter(channel.ID, includeRegex, excludeRegex) || matchFilter(channel.DisplayName(), includeRegex, excludeRegex) {
 				filtered = append(filtered, channel)
+				continue
 			}
+			continue
+		}
+
+		if matchFilter(target, includeRegex, excludeRegex) {
+			filtered = append(filtered, channel)
 		}
 	}
 

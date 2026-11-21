@@ -5,26 +5,47 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"regexp"
 	"strconv"
+	"strings"
 )
 
 // FlexInt 是一个灵活的整数类型，可以从 JSON 中的数字或字符串解析
 type FlexInt int
 
-// UnmarshalJSON 实现了 json.Unmarshaler 接口
 func (fi *FlexInt) UnmarshalJSON(data []byte) error {
-	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
-		// 如果是字符串，去掉引号
-		data = data[1 : len(data)-1]
+	str := strings.TrimSpace(string(data))
+	if str == "null" || str == "" {
+		*fi = 0
+		return nil
 	}
-
-	// 尝试将数据解析为整数
-	i, err := strconv.Atoi(string(data))
+	if str == "true" {
+		*fi = 1
+		return nil
+	}
+	if str == "false" {
+		*fi = 0
+		return nil
+	}
+	if len(str) >= 2 && str[0] == '"' && str[len(str)-1] == '"' {
+		str = str[1 : len(str)-1]
+		if str == "true" {
+			*fi = 1
+			return nil
+		}
+		if str == "false" || str == "" {
+			*fi = 0
+			return nil
+		}
+	}
+	i, err := strconv.Atoi(str)
 	if err != nil {
+		f, errF := strconv.ParseFloat(str, 64)
+		if errF == nil {
+			*fi = FlexInt(int(f))
+			return nil
+		}
 		return fmt.Errorf("FlexInt: %w", err)
 	}
-
 	*fi = FlexInt(i)
 	return nil
 }
@@ -113,10 +134,7 @@ func LoadTvBoxData(uri string) ([]byte, error) {
 		return nil, err
 	}
 
-	// Remove comments from JSON
-	re := regexp.MustCompile(`(?m)^\s*//.*$|/\*[\s\S]*?\*/`)
-	data = re.ReplaceAll(data, []byte{})
-
+	data = StripJSONComments(data)
 	return data, nil
 }
 
@@ -154,4 +172,58 @@ func LoadTvBoxConfig(uri string) (*TvBoxRepoConfig, error) {
 		return nil, err
 	}
 	return ParseTvBoxConfig(bytes.NewReader(data))
+}
+
+// StripJSONComments removes both block and inline comments while preserving strings (including URLs)
+func StripJSONComments(data []byte) []byte {
+	out := make([]byte, 0, len(data))
+	n := len(data)
+	inString := false
+	escaped := false
+
+	for i := 0; i < n; i++ {
+		c := data[i]
+
+		if inString {
+			out = append(out, c)
+			if escaped {
+				escaped = false
+			} else if c == '\\' {
+				escaped = true
+			} else if c == '"' {
+				inString = false
+			}
+			continue
+		}
+
+		if c == '"' {
+			inString = true
+			out = append(out, c)
+			continue
+		}
+
+		if c == '/' && i+1 < n && data[i+1] == '/' {
+			i += 2
+			for i < n && data[i] != '\n' {
+				i++
+			}
+			if i < n {
+				out = append(out, data[i])
+			}
+			continue
+		}
+
+		if c == '/' && i+1 < n && data[i+1] == '*' {
+			i += 2
+			for i+1 < n && !(data[i] == '*' && data[i+1] == '/') {
+				i++
+			}
+			i++
+			continue
+		}
+
+		out = append(out, c)
+	}
+
+	return out
 }

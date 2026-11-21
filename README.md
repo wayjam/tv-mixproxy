@@ -6,16 +6,18 @@
 ![Vercel](https://img.shields.io/badge/Vercel-333?logo=vercel&link=https://github.com/wayjam/tv-mixproxy/blob/main/docs/vercel.md)
 ![GitHub Actions](https://github.com/wayjam/tv-mixproxy/actions/workflows/test.yml/badge.svg)
 
-TV MixProxy 是一个用于混合不同 电视接口 并提供服务的工具。它支持单仓配置和多仓配置，可以轻松地整合多个来源配置。
+TV MixProxy 是一个用于混合不同 电视接口 并提供服务的工具。它支持单仓配置和多仓配置，可以轻松地整合多个来源配置。由于电视源的不稳定性，本项目希望提供一个统一的接口，当电视源变化时，无须再反复修改电视上的配置。
 
 ## 功能特点
 
-- 支持TVBox单仓库和TvBox多仓库设置
-- 支持代理 EPG
-- 支持代理 M3U 媒体播放列表
-- 可自定义不同配置字段的混合选项
-- 定期更新源配置
-
+- 支持 TVBox 单仓库和 TVBox 多仓库设置，支持在 `lives` 中通过 `source_name: "internal/m3u"` 自动引入内置 M3U 频道
+- 支持代理与混合 XMLTV 标准 EPG，以及 DIYP 轻量级 JSON EPG 接口
+- 支持代理与混合 M3U 媒体播放列表，自动注入 `x-tvg-url`，兼容主流 IPTV 客户端（TiviMate, Kodi, PotPlayer, APtv）
+- 支持 TXT / DIYP 纯文本直播源格式双向互转与统一聚合
+- 全局内存缓存层与 HTTP 协商缓存（ETag / If-None-Match 304 Not Modified），多端并发唤醒秒级响应
+- 源请求并发合并（Singleflight），防止多客户端同时请求导致上游被封
+- 可自定义不同配置字段的混合与过滤选项（支持正则及多种属性匹配）
+- 定期后台异步自动更新源配置
 ## 部署
 
 ### 二进制
@@ -40,16 +42,19 @@ ghcr.io/tv-mixproxy/tv-mixproxy:latest
 
 ## 接口说明
 
-- `/logo`: 获取 Logo 图片
-- `/wallpaper`: 获取壁纸图片
+- `/logo`: 获取 Logo 图片（带缓存控制）
+- `/wallpaper`: 获取壁纸图片（带缓存控制）
 - `/v1/tvbox/spider`: 代理单仓的 spider 配置
-- `/v1/tvbox/repo`: 获取混合后的单仓配置
-- `/v1/tvbox/multi_repo`: 获取混合后的多仓配置
+- `/v1/tvbox/repo`: 获取混合后的单仓配置（支持 ETag 304 缓存）
+- `/v1/tvbox/multi_repo`: 获取混合后的多仓配置（支持 ETag 304 缓存）
 - `/v1/epg.xml`: 
-    - 获取混合后的EPG XML 列表, 支持 gzip 压缩
-    - 默认返回 xml 格式, 可以通过 `format=gz` 获取 gzip 压缩的 xml 文件
-- `/v1/m3u/media_playlist`: 获取混合后的 m3u 媒体播放列表
-
+    - 获取混合后的 XMLTV EPG XML 列表，支持 gzip 压缩（`?format=gz`），支持 ETag 304 缓存
+- `/api/diyp` 或 `/v1/epg/diyp`:
+    - DIYP 轻量级 EPG JSON 接口，支持参数：`ch`（频道名称，支持模糊匹配）、`date`（日期，格式 `YYYY-MM-DD`，默认为当天）
+    - 响应格式：`{"channel_name":"CCTV1","date":"2026-11-21","epg_data":[{"title":"新闻","start":"08:00","end":"09:00"}]}`
+- `/v1/m3u/media_playlist`: 获取混合后的 M3U 媒体播放列表（自动关联 `x-tvg-url`，规范化标签与属性）
+- `/v1/live.txt` 或 `/live.txt`: 获取 TXT / DIYP 文本直播源格式（`分组,#genre#` 与 `频道名,URL`）
+- `/refresh_source`: 触发源主动刷新与缓存清理（需提供 `CRON_SECRET` 或 `TV_MIXPROXY_SECRET` 鉴权）
 ## 配置说明
 
 用 YAML 格式的配置文件。详细配置说明请参阅 [配置说明](docs/configuration.md)。

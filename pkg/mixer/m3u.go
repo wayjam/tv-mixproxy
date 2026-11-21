@@ -3,9 +3,11 @@ package mixer
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/wayjam/tv-mixproxy/config"
 	"github.com/wayjam/tv-mixproxy/pkg/m3u"
+	"github.com/wayjam/tv-mixproxy/pkg/txt"
 )
 
 func MixM3UMediaPlayList(
@@ -39,13 +41,22 @@ func MixM3UMediaPlayList(
 			return nil, fmt.Errorf("get source %s: %w", filter.SourceName, err)
 		}
 
-		if source.Type() != config.SourceTypeM3U {
+		var playlist *m3u.Playlist
+		switch source.Type() {
+		case config.SourceTypeM3U:
+			pl, err := config.ParseM3U8Config(bytes.NewReader(source.Data()))
+			if err != nil {
+				return nil, fmt.Errorf("decode media playlist: %w", err)
+			}
+			playlist = &pl
+		case config.SourceTypeTXT, config.SourceTypeDIYP:
+			txtPl, err := txt.Unmarshal(source.Data())
+			if err != nil {
+				return nil, fmt.Errorf("decode txt playlist: %w", err)
+			}
+			playlist = txtPl.ToM3U()
+		default:
 			continue
-		}
-
-		playlist, err := config.ParseM3U8Config(bytes.NewReader(source.Data()))
-		if err != nil {
-			return nil, fmt.Errorf("decode media playlist: %w", err)
 		}
 
 		includeRegex := compileRegex(filter.Include)
@@ -53,10 +64,28 @@ func MixM3UMediaPlayList(
 
 		for i := range playlist.Tracks {
 			track := playlist.Tracks[i]
-			if filter.FilterBy != "" {
-				if !matchFilter(track.Name, includeRegex, excludeRegex) {
-					continue
+			targetVal := track.Name
+			switch strings.ToLower(filter.FilterBy) {
+			case "group-title", "group":
+				targetVal = track.GetTag("group-title")
+			case "tvg-name":
+				targetVal = track.GetTag("tvg-name")
+				if targetVal == "" {
+					targetVal = track.Name
 				}
+			case "tvg-id":
+				targetVal = track.GetTag("tvg-id")
+			case "name", "":
+				targetVal = track.Name
+			default:
+				tagVal := track.GetTag(filter.FilterBy)
+				if tagVal != "" {
+					targetVal = tagVal
+				}
+			}
+
+			if !matchFilter(targetVal, includeRegex, excludeRegex) {
+				continue
 			}
 
 			result.Tracks = append(result.Tracks, track)
@@ -71,6 +100,9 @@ func MixM3UMediaPlayList(
 			}
 			result.VariantStreams = append(result.VariantStreams, variant)
 		}
+	}
+	if !cfg.EPGOpt.Disable && result.GetTag("x-tvg-url") == "" {
+		result.SetTag("x-tvg-url", getExternalURL(cfg)+"/v1/epg.xml")
 	}
 
 	return &result, nil

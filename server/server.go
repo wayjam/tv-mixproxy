@@ -14,6 +14,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/cache"
 	"github.com/wayjam/tv-mixproxy/pkg/mixer"
 )
 
@@ -21,6 +22,7 @@ type server struct {
 	app           *fiber.App
 	cfg           *config.Config
 	sourceManager *mixer.SourceManager
+	cacheManager  *cache.Manager
 }
 
 func NewServer(cfg *config.Config) *server {
@@ -59,11 +61,13 @@ func NewServer(cfg *config.Config) *server {
 	}))
 
 	sourceManager := mixer.NewSourceManager(cfg.Sources, slog.Default())
+	cacheManager := cache.NewManager()
 
 	return &server{
 		app:           app,
 		cfg:           cfg,
 		sourceManager: sourceManager,
+		cacheManager:  cacheManager,
 	}
 }
 
@@ -72,16 +76,21 @@ func (s *server) SetupRoutes() {
 	app.Get("/", Home)
 	app.Get("/logo", Logo)
 	app.Get("/wallpaper", Wallpaper)
-	app.Get("/refresh_source", RefershSrouceHandler(s.cfg, s.sourceManager))
+	app.Get("/live.txt", NewLiveTXTHandler(s.cfg, s.sourceManager, s.cacheManager))
+	app.Get("/api/diyp", NewDIYPHandler(s.cfg, s.sourceManager, s.cacheManager))
+	app.Get("/api/diyp/", NewDIYPHandler(s.cfg, s.sourceManager, s.cacheManager))
+	app.Get("/refresh_source", RefershSrouceHandler(s.cfg, s.sourceManager, s.cacheManager))
 
 	v1 := app.Group("/v1")
-	v1.Get("/tvbox/repo", NewRepoHandler(s.cfg, s.sourceManager))
-	v1.Get("/tvbox/multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager))
+	v1.Get("/tvbox/repo", NewRepoHandler(s.cfg, s.sourceManager, s.cacheManager))
+	v1.Get("/tvbox/multi_repo", NewMultiRepoHandler(s.cfg, s.sourceManager, s.cacheManager))
 	v1.Get("/tvbox/spider", NewSpiderHandler(s.cfg, s.sourceManager))
-	v1.Get("/epg.xml", NewEPGHandler(s.cfg, s.sourceManager))
-	v1.Get("/m3u/media_playlist", NewM3UMediaHandler(s.cfg, s.sourceManager))
+	v1.Get("/epg.xml", NewEPGHandler(s.cfg, s.sourceManager, s.cacheManager))
+	v1.Get("/epg/diyp", NewDIYPHandler(s.cfg, s.sourceManager, s.cacheManager))
+	v1.Get("/m3u/media_playlist", NewM3UMediaHandler(s.cfg, s.sourceManager, s.cacheManager))
+	v1.Get("/live.txt", NewLiveTXTHandler(s.cfg, s.sourceManager, s.cacheManager))
+	v1.Get("/txt/live", NewLiveTXTHandler(s.cfg, s.sourceManager, s.cacheManager))
 }
-
 func (s *server) App() *fiber.App {
 	return s.app
 }

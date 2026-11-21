@@ -11,10 +11,17 @@ type EPG struct {
 }
 
 type Channel struct {
-	ID          string `xml:"id,attr"`
-	DisplayName Txt    `xml:"display-name"`
-	URL         string `xml:"url,omitempty"`
-	Icon        *Icon  `xml:"icon,omitempty"`
+	ID           string `xml:"id,attr"`
+	DisplayNames []Txt  `xml:"display-name"`
+	URL          string `xml:"url,omitempty"`
+	Icon         *Icon  `xml:"icon,omitempty"`
+}
+
+func (c *Channel) DisplayName() string {
+	if len(c.DisplayNames) > 0 {
+		return c.DisplayNames[0].Text
+	}
+	return ""
 }
 
 type Programme struct {

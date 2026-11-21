@@ -1,8 +1,11 @@
 package server
 
 import (
+	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"image/png"
 	"os"
 	"strconv"
@@ -11,8 +14,8 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 
 	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/cache"
 	"github.com/wayjam/tv-mixproxy/pkg/imageutil"
-	"github.com/wayjam/tv-mixproxy/pkg/m3u"
 	"github.com/wayjam/tv-mixproxy/pkg/mixer"
 )
 
@@ -59,6 +62,7 @@ func generateLogoSVG() string {
 
 func Logo(c fiber.Ctx) error {
 	c.Set("Content-Type", "image/svg+xml")
+	c.Set("Cache-Control", "public, max-age=86400")
 	return c.SendString(generateLogoSVG())
 }
 
@@ -86,36 +90,94 @@ func Wallpaper(c fiber.Ctx) error {
 
 	img := imageutil.GenerateImage(params)
 	c.Set("Content-Type", "image/png")
+	c.Set("Cache-Control", "public, max-age=86400")
 	return png.Encode(c, img)
 }
 
-func NewRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
+func sendCachedOrCompute(
+	c fiber.Ctx,
+	cacheManager *cache.Manager,
+	cacheKey string,
+	version string,
+	contentType string,
+	extraHeaders map[string]string,
+	compute func() ([]byte, error),
+) error {
+	if cacheManager != nil {
+		if entry, ok := cacheManager.Get(cacheKey); ok && entry.Version == version {
+			for k, v := range entry.Header {
+				c.Set(k, v)
+			}
+			c.Set("ETag", entry.ETag)
+			c.Set("Cache-Control", "public, max-age=60")
+
+			if match := c.Get("If-None-Match"); match != "" && (match == entry.ETag || match == "*") {
+				return c.SendStatus(fiber.StatusNotModified)
+			}
+
+			c.Set("Content-Type", entry.ContentType)
+			return c.Send(entry.Data)
+		}
+	}
+
+	data, err := compute()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+	}
+
+	var etag string
+	if cacheManager != nil {
+		entry := cacheManager.Set(cacheKey, data, contentType, version, extraHeaders)
+		etag = entry.ETag
+	}
+
+	for k, v := range extraHeaders {
+		c.Set(k, v)
+	}
+	if etag != "" {
+		c.Set("ETag", etag)
+		c.Set("Cache-Control", "public, max-age=60")
+
+		if match := c.Get("If-None-Match"); match != "" && (match == etag || match == "*") {
+			return c.SendStatus(fiber.StatusNotModified)
+		}
+	}
+
+	c.Set("Content-Type", contentType)
+	return c.Send(data)
+}
+
+func NewRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cacheManager *cache.Manager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if cfg.TvBoxSingleRepoOpt.Disable {
 			return c.Status(fiber.StatusNotImplemented).SendString("SingleRepo is disabled")
 		}
 
-		result, err := mixer.MixTvBoxRepo(cfg, sourceManager)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-		}
-
-		return c.JSON(result)
+		version := sourceManager.GetFingerprint()
+		return sendCachedOrCompute(c, cacheManager, "tvbox_repo", version, "application/json; charset=utf-8", nil, func() ([]byte, error) {
+			result, err := mixer.MixTvBoxRepo(cfg, sourceManager)
+			if err != nil {
+				return nil, err
+			}
+			return json.Marshal(result)
+		})
 	}
 }
 
-func NewMultiRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
+func NewMultiRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cacheManager *cache.Manager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if cfg.TvBoxMultiRepoOpt.Disable {
 			return c.Status(fiber.StatusNotImplemented).SendString("MultiRepo is disabled")
 		}
 
-		result, err := mixer.MixMultiRepo(cfg, sourceManager)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-		}
-
-		return c.JSON(result)
+		version := sourceManager.GetFingerprint()
+		return sendCachedOrCompute(c, cacheManager, "tvbox_multi_repo", version, "application/json; charset=utf-8", nil, func() ([]byte, error) {
+			result, err := mixer.MixMultiRepo(cfg, sourceManager)
+			if err != nil {
+				return nil, err
+			}
+			return json.Marshal(result)
+		})
 	}
 }
 
@@ -132,59 +194,78 @@ func NewSpiderHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fi
 	}
 }
 
-func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
+func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cacheManager *cache.Manager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if cfg.EPGOpt.Disable {
 			return c.Status(fiber.StatusNotImplemented).SendString("EPG is disabled")
 		}
 
-		result, err := mixer.MixEPG(cfg, sourceManager)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-		}
-
 		format := c.Query("format", "xml")
-
-		c.Set("Content-Type", "application/xml")
-		c.Set("Content-Encoding", "gzip")
+		version := sourceManager.GetFingerprint()
 
 		if format == "gz" {
-			c.Set("Content-Disposition", "attachment; filename=epg.xml.gz")
+			headers := map[string]string{
+				"Content-Disposition": "attachment; filename=epg.xml.gz",
+			}
+			return sendCachedOrCompute(c, cacheManager, "epg_xml_gz", version, "application/gzip", headers, func() ([]byte, error) {
+				result, err := mixer.MixEPG(cfg, sourceManager)
+				if err != nil {
+					return nil, err
+				}
+				buf := new(bytes.Buffer)
+				gzWriter := gzip.NewWriter(buf)
+				if _, err := gzWriter.Write([]byte(xml.Header)); err != nil {
+					return nil, err
+				}
+				encoder := xml.NewEncoder(gzWriter)
+				encoder.Indent("", "  ")
+				if err := encoder.Encode(result); err != nil {
+					return nil, err
+				}
+				if err := gzWriter.Close(); err != nil {
+					return nil, err
+				}
+				return buf.Bytes(), nil
+			})
 		}
 
-		gzipWriter := gzip.NewWriter(c)
-		defer gzipWriter.Close()
-
-		encoder := xml.NewEncoder(gzipWriter)
-		if err := encoder.Encode(result); err != nil {
-			return c.Status(fiber.StatusInternalServerError).SendString("Error encoding and compressing XML")
-		}
-
-		return nil
+		return sendCachedOrCompute(c, cacheManager, "epg_xml", version, "application/xml; charset=utf-8", nil, func() ([]byte, error) {
+			result, err := mixer.MixEPG(cfg, sourceManager)
+			if err != nil {
+				return nil, err
+			}
+			buf := new(bytes.Buffer)
+			if _, err := buf.Write([]byte(xml.Header)); err != nil {
+				return nil, err
+			}
+			encoder := xml.NewEncoder(buf)
+			encoder.Indent("", "  ")
+			if err := encoder.Encode(result); err != nil {
+				return nil, err
+			}
+			return buf.Bytes(), nil
+		})
 	}
 }
 
-func NewM3UMediaHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
+func NewM3UMediaHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cacheManager *cache.Manager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if cfg.M3UOpt.Disable {
 			return c.Status(fiber.StatusNotImplemented).SendString("M3U is disabled")
 		}
 
-		result, err := mixer.MixM3UMediaPlayList(cfg, sourceManager)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-		}
-
-		encoder := m3u.NewEncoder(c)
-		if err := encoder.Encode(result); err != nil {
-			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-		}
-
-		return nil
+		version := sourceManager.GetFingerprint()
+		return sendCachedOrCompute(c, cacheManager, "m3u_media_playlist", version, "application/vnd.apple.mpegurl; charset=utf-8", nil, func() ([]byte, error) {
+			result, err := mixer.MixM3UMediaPlayList(cfg, sourceManager)
+			if err != nil {
+				return nil, err
+			}
+			return result.MarshalM3U()
+		})
 	}
 }
 
-func RefershSrouceHandler(cfg *config.Config, sourceManager *mixer.SourceManager) fiber.Handler {
+func RefershSrouceHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cacheManager *cache.Manager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cronSecret := os.Getenv("CRON_SECRET")
 		token := os.Getenv("TV_MIXPROXY_SECRET")
@@ -201,7 +282,50 @@ func RefershSrouceHandler(cfg *config.Config, sourceManager *mixer.SourceManager
 			return c.Status(fiber.StatusUnauthorized).SendString("Unauthorized")
 		}
 
-		go sourceManager.TriggerRefresh(false)
+		go func() {
+			sourceManager.TriggerRefresh(false)
+			if cacheManager != nil {
+				cacheManager.Clear()
+			}
+		}()
 		return c.SendStatus(fiber.StatusOK)
+	}
+}
+
+func NewLiveTXTHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cacheManager *cache.Manager) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if cfg.M3UOpt.Disable {
+			return c.Status(fiber.StatusNotImplemented).SendString("Live list is disabled")
+		}
+
+		version := sourceManager.GetFingerprint()
+		return sendCachedOrCompute(c, cacheManager, "live_txt", version, "text/plain; charset=utf-8", nil, func() ([]byte, error) {
+			result, err := mixer.MixTXT(cfg, sourceManager)
+			if err != nil {
+				return nil, err
+			}
+			return result.Marshal()
+		})
+	}
+}
+
+func NewDIYPHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cacheManager *cache.Manager) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if cfg.EPGOpt.Disable {
+			return c.Status(fiber.StatusNotImplemented).SendString("EPG is disabled")
+		}
+
+		ch := c.Query("ch")
+		date := c.Query("date")
+		version := sourceManager.GetFingerprint()
+		cacheKey := fmt.Sprintf("diyp_%s_%s", ch, date)
+
+		return sendCachedOrCompute(c, cacheManager, cacheKey, version, "application/json; charset=utf-8", nil, func() ([]byte, error) {
+			result, err := mixer.QueryDIYPEPG(cfg, sourceManager, ch, date)
+			if err != nil {
+				return nil, err
+			}
+			return json.Marshal(result)
+		})
 	}
 }
