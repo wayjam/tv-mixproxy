@@ -188,3 +188,130 @@ func TestDIYPHandlerCachingAnd304(t *testing.T) {
 	body4, _ := io.ReadAll(resp4.Body)
 	assert.Contains(t, string(body4), `"epg_data":[]`)
 }
+func TestConfigurableCacheAndDisable(t *testing.T) {
+	tmpDir := t.TempDir()
+	m3uPath := filepath.Join(tmpDir, "test.m3u")
+	_ = os.WriteFile(m3uPath, []byte("#EXTM3U\n#EXTINF:-1,CCTV1\nhttp://example.com/cctv1.m3u8\n"), 0644)
+
+	// 1. Test custom max-age = 300
+	cfg1 := &config.Config{
+		Sources: []config.Source{{Name: "local_m3u", URL: "file://" + m3uPath, Type: config.SourceTypeM3U}},
+		M3UOpt: config.M3UOpt{
+			MediaPlaylistFilters: []config.ArrayMixOpt{{MixOpt: config.MixOpt{SourceName: "local_m3u"}}},
+		},
+		CacheOpt: config.CacheOpt{
+			MaxAge: 300,
+		},
+	}
+	cfg1.Fixture()
+	srv1 := NewServer(cfg1)
+	srv1.SetupRoutes()
+	resp1, err := srv1.App().Test(httptest.NewRequest("GET", "/v1/m3u/media_playlist", nil))
+	assert.NoError(t, err)
+	assert.Equal(t, 200, resp1.StatusCode)
+	assert.Equal(t, "public, max-age=300", resp1.Header.Get("Cache-Control"))
+
+	// 2. Test cache disabled
+	cfg2 := &config.Config{
+		Sources: []config.Source{{Name: "local_m3u", URL: "file://" + m3uPath, Type: config.SourceTypeM3U}},
+		M3UOpt: config.M3UOpt{
+			MediaPlaylistFilters: []config.ArrayMixOpt{{MixOpt: config.MixOpt{SourceName: "local_m3u"}}},
+		},
+		CacheOpt: config.CacheOpt{
+			Disable: true,
+		},
+	}
+	cfg2.Fixture()
+	srv2 := NewServer(cfg2)
+	srv2.SetupRoutes()
+	resp2, err := srv2.App().Test(httptest.NewRequest("GET", "/v1/m3u/media_playlist", nil))
+	assert.NoError(t, err)
+	assert.Equal(t, 200, resp2.StatusCode)
+	assert.Equal(t, "no-cache, no-store, must-revalidate", resp2.Header.Get("Cache-Control"))
+}
+
+func TestSecuritySecretRefreshSource(t *testing.T) {
+	cfg := &config.Config{
+		SecurityOpt: config.SecurityOpt{
+			Secret: "custom_pass_123",
+		},
+	}
+	cfg.Fixture()
+	srv := NewServer(cfg)
+	srv.SetupRoutes()
+	app := srv.App()
+
+	// 1. No secret provided -> 401
+	req1 := httptest.NewRequest("GET", "/refresh_source", nil)
+	resp1, err := app.Test(req1)
+	assert.NoError(t, err)
+	assert.Equal(t, 401, resp1.StatusCode)
+
+	// 2. Secret in header X-TV-MIXPROXY-SECRET -> 200
+	req2 := httptest.NewRequest("GET", "/refresh_source", nil)
+	req2.Header.Set("X-TV-MIXPROXY-SECRET", "custom_pass_123")
+	resp2, err := app.Test(req2)
+	assert.NoError(t, err)
+	assert.Equal(t, 200, resp2.StatusCode)
+
+	// 3. Secret in Authorization Bearer -> 200
+	req3 := httptest.NewRequest("GET", "/refresh_source", nil)
+	req3.Header.Set("Authorization", "Bearer custom_pass_123")
+	resp3, err := app.Test(req3)
+	assert.NoError(t, err)
+	assert.Equal(t, 200, resp3.StatusCode)
+
+	// 4. Secret in query parameter ?token= -> 200
+	req4 := httptest.NewRequest("GET", "/refresh_source?token=custom_pass_123", nil)
+	resp4, err := app.Test(req4)
+	assert.NoError(t, err)
+	assert.Equal(t, 200, resp4.StatusCode)
+}
+
+func TestAntiOOMAndLRUProtection(t *testing.T) {
+	tmpDir := t.TempDir()
+	m3uPath := filepath.Join(tmpDir, "test.m3u")
+	_ = os.WriteFile(m3uPath, []byte("#EXTM3U\n#EXTINF:-1,CCTV1\nhttp://example.com/cctv1.m3u8\n"), 0644)
+
+	cfg := &config.Config{
+		Sources: []config.Source{
+			{Name: "local_m3u", URL: "file://" + m3uPath, Type: config.SourceTypeM3U},
+		},
+		M3UOpt: config.M3UOpt{
+			MediaPlaylistFilters: []config.ArrayMixOpt{{MixOpt: config.MixOpt{SourceName: "local_m3u"}}},
+		},
+		CacheOpt: config.CacheOpt{
+			MaxEntries: 3, // Capacity limited to 3 entries
+		},
+	}
+	cfg.Fixture()
+	srv := NewServer(cfg)
+	srv.SetupRoutes()
+	app := srv.App()
+
+	// 1. Initial M3U request (pinned)
+	reqM3U := httptest.NewRequest("GET", "/v1/m3u/media_playlist", nil)
+	respM3U, err := app.Test(reqM3U)
+	assert.NoError(t, err)
+	assert.Equal(t, 200, respM3U.StatusCode)
+	m3uETag := respM3U.Header.Get("ETag")
+	assert.NotEmpty(t, m3uETag)
+
+	// 2. Flood with 10 dynamic DIYP requests
+	for i := 0; i < 10; i++ {
+		reqFlood := httptest.NewRequest("GET", "/api/diyp?ch=rand_"+string(rune('a'+i)), nil)
+		respFlood, err := app.Test(reqFlood)
+		assert.NoError(t, err)
+		assert.Equal(t, 200, respFlood.StatusCode)
+	}
+
+	// 3. Cache length must be bounded by MaxEntries (<= 3)
+	assert.LessOrEqual(t, srv.cacheManager.Len(), 3)
+
+	// 4. Pinned M3U must still be in cache and return 304 Not Modified
+	reqM3UCheck := httptest.NewRequest("GET", "/v1/m3u/media_playlist", nil)
+	reqM3UCheck.Header.Set("If-None-Match", m3uETag)
+	respM3UCheck, err := app.Test(reqM3UCheck)
+	assert.NoError(t, err)
+	assert.Equal(t, 304, respM3UCheck.StatusCode, "pinned m3u must remain in cache despite dynamic flood")
+}

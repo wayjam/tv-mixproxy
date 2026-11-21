@@ -68,4 +68,50 @@ http://example.com/zhejiang.m3u8
 		// Verify auto-linked EPG
 		assert.Equal(t, "http://proxy.test/v1/epg.xml", result.GetTag("x-tvg-url"))
 	})
+
+	t.Run("Cleaner and EPGMapping enabled", func(t *testing.T) {
+		cfg := &config.Config{
+			ServerPort:  8080,
+			ExternalURL: "http://proxy.test",
+			M3UOpt: config.M3UOpt{
+				DefaultGroup: "央视频道",
+				EPGURLs:      []string{"{external_url}/v1/epg.xml", "http://backup.epg/e.xml"},
+				MediaPlaylistFilters: []config.ArrayMixOpt{
+					{
+						MixOpt:   config.MixOpt{SourceName: "src1"},
+						FilterBy: "name",
+						Include:  "CCTV-1.*",
+					},
+				},
+			},
+			CleanerOpt: config.CleanerOpt{
+				Enable: true,
+			},
+			EPGMappingOpt: config.EPGMappingOpt{
+				Enable:          true,
+				LogoURLTemplate: "http://logo.test/{name}.png",
+				Mappings: map[string]string{
+					"CCTV-1": "cctv1.epg.id",
+				},
+			},
+		}
+
+		result, err := MixM3UMediaPlayList(cfg, mockSourcer)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Len(t, result.Tracks, 1)
+
+		track := result.Tracks[0]
+		// Name cleaned from "CCTV-1 综合" to "CCTV-1"
+		assert.Equal(t, "CCTV-1", track.Name)
+		// tvg-id mapped to "cctv1.epg.id"
+		assert.Equal(t, "cctv1.epg.id", track.GetTag("tvg-id"))
+		// tvg-logo mapped to "http://logo.test/CCTV-1.png"
+		assert.Equal(t, "http://logo.test/CCTV-1.png", track.GetTag("tvg-logo"))
+		// group-title preserved from original tag
+		assert.Equal(t, "央视", track.GetTag("group-title"))
+
+		// Custom multi-EPG URLs
+		assert.Equal(t, "http://proxy.test/v1/epg.xml,http://backup.epg/e.xml", result.GetTag("x-tvg-url"))
+	})
 }

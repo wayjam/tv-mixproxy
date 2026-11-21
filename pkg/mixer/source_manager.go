@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"os"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -29,6 +32,7 @@ type Sourcer interface {
 // )
 
 type SourceManager struct {
+	cfg     *config.Config
 	sources map[string]*Source
 	mu      sync.RWMutex
 	ticker  *time.Ticker
@@ -83,7 +87,19 @@ func (s *Source) GetSource(_ string) ([]byte, error) {
 }
 
 func NewSourceManager(sources []config.Source, logger *slog.Logger) *SourceManager {
+	cfg := &config.Config{Sources: sources}
+	cfg.Fixture()
+	return NewSourceManagerWithConfig(cfg, logger)
+}
+
+func NewSourceManagerWithConfig(cfg *config.Config, logger *slog.Logger) *SourceManager {
+	var sources []config.Source
+	if cfg != nil {
+		sources = cfg.Sources
+	}
+
 	sm := &SourceManager{
+		cfg:     cfg,
 		sources: make(map[string]*Source),
 		ticker:  time.NewTicker(1 * time.Minute), // 每分钟检查一次
 		done:    make(chan bool),
@@ -95,14 +111,37 @@ func NewSourceManager(sources []config.Source, logger *slog.Logger) *SourceManag
 	}
 
 	for _, s := range sources {
-		sm.sources[s.Name] = &Source{
+		src := &Source{
 			config: s,
 		}
+		// 如果开启了磁盘持久化，尝试预加载本地快照
+		if cfg != nil && cfg.PersistenceOpt.Enable {
+			diskPath := sm.getDiskSnapshotPath(s.Name)
+			if diskData, err := os.ReadFile(diskPath); err == nil && len(diskData) > 0 {
+				src.data = diskData
+				src.lastUpdate = time.Now()
+				src.version = 1
+			}
+		}
+		sm.sources[s.Name] = src
 	}
 
 	go sm.refreshLoop()
 
 	return sm
+}
+
+func (sm *SourceManager) getDiskSnapshotPath(name string) string {
+	if sm.cfg == nil {
+		return ""
+	}
+	dir := sm.cfg.PersistenceOpt.Dir
+	if dir == "" {
+		dir = "./data/cache"
+	}
+	_ = os.MkdirAll(dir, 0755)
+	safeName := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(name, "_")
+	return filepath.Join(dir, safeName+".bak")
 }
 
 func (sm *SourceManager) log(format string, args ...any) {
@@ -204,18 +243,74 @@ func (sm *SourceManager) refreshSource(name string) error {
 	defer func() {
 		sm.log("refresh source %s: %v", name, err)
 	}()
+	timeout := 15
+	if sm.cfg != nil && sm.cfg.NetworkOpt.Timeout > 0 {
+		timeout = sm.cfg.NetworkOpt.Timeout
+	}
+	if source.config.Timeout > 0 {
+		timeout = source.config.Timeout
+	}
+
+	retry := 0
+	if sm.cfg != nil && sm.cfg.NetworkOpt.Retry > 0 {
+		retry = sm.cfg.NetworkOpt.Retry
+	}
+
+	proxy := ""
+	if sm.cfg != nil && sm.cfg.NetworkOpt.ProxyURL != "" {
+		proxy = sm.cfg.NetworkOpt.ProxyURL
+	}
+	if source.config.ProxyURL != "" {
+		proxy = source.config.ProxyURL
+	}
+
+	headers := make(map[string]string)
+	if sm.cfg != nil {
+		for k, v := range sm.cfg.NetworkOpt.Headers {
+			headers[k] = v
+		}
+	}
+	for k, v := range source.config.Headers {
+		headers[k] = v
+	}
+
+	fetchOpts := config.FetchOptions{
+		Timeout:  time.Duration(timeout) * time.Second,
+		Retry:    retry,
+		ProxyURL: proxy,
+		Headers:  headers,
+	}
 
 	switch source.Type() {
 	case config.SourceTypeTvBoxSingle, config.SourceTypeTvBoxMulti:
-		data, err = config.LoadTvBoxData(source.config.URL)
+		data, err = config.LoadTvBoxDataWithOptions(source.config.URL, fetchOpts)
 	case config.SourceTypeEPG, config.SourceTypeM3U, config.SourceTypeTXT, config.SourceTypeDIYP:
-		data, err = config.FetchData(source.config.URL)
+		data, err = config.FetchDataWithOptions(source.config.URL, fetchOpts)
 	}
 
 	source.mu.Lock()
 	defer source.mu.Unlock()
 
+	diskPath := sm.getDiskSnapshotPath(name)
+
 	if err != nil {
+		// 故障降级逻辑 (Stale-On-Error)
+		if sm.cfg != nil && sm.cfg.PersistenceOpt.Enable && sm.cfg.PersistenceOpt.StaleOnError {
+			if source.data != nil {
+				sm.log("source %s fetch failed, retaining existing in-memory snapshot: %v", name, err)
+				return nil
+			}
+			if diskPath != "" {
+				if diskData, readErr := os.ReadFile(diskPath); readErr == nil && len(diskData) > 0 {
+					source.data = diskData
+					source.lastUpdate = time.Now()
+					source.version++
+					sm.log("source %s fetch failed, fallback to disk snapshot (%s): %v", name, diskPath, err)
+					return nil
+				}
+			}
+		}
+
 		source.lastError = time.Now()
 		source.errorCount++
 		return err
@@ -226,6 +321,10 @@ func (sm *SourceManager) refreshSource(name string) error {
 	source.lastError = time.Time{}
 	source.errorCount = 0
 	source.version++
+
+	if diskPath != "" && sm.cfg != nil && sm.cfg.PersistenceOpt.Enable {
+		_ = os.WriteFile(diskPath, data, 0644)
+	}
 	return nil
 }
 

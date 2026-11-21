@@ -147,3 +147,48 @@ func TestConcurrentGetSource_Singleflight(t *testing.T) {
 	fp2 := sm.GetFingerprint("test_concurrent")
 	assert.Equal(t, fp1, fp2)
 }
+
+func TestPersistenceAndStaleOnError(t *testing.T) {
+	cacheDir := t.TempDir()
+	shouldFail := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if shouldFail {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte("source_snapshot_data"))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Sources: []config.Source{
+			{Name: "test_persist", URL: server.URL, Type: config.SourceTypeM3U, Interval: 60},
+		},
+		PersistenceOpt: config.PersistenceOpt{
+			Enable:       true,
+			Dir:          cacheDir,
+			StaleOnError: true,
+		},
+	}
+	cfg.Fixture()
+
+	sm := NewSourceManagerWithConfig(cfg, nil)
+
+	// 1. Initial fetch succeeds
+	src, err := sm.GetSource("test_persist")
+	assert.NoError(t, err)
+	assert.Equal(t, "source_snapshot_data", string(src.Data()))
+
+	// 2. Server goes down, manual refresh triggers Stale-on-error fallback
+	shouldFail = true
+	err = sm.refreshSource("test_persist")
+	assert.NoError(t, err, "stale-on-error should suppress error and keep old data")
+	assert.Equal(t, "source_snapshot_data", string(src.Data()))
+
+	// 3. Cold restart preloading: create brand new manager with server still down
+	smRestart := NewSourceManagerWithConfig(cfg, nil)
+	srcRestart, err := smRestart.GetSource("test_persist")
+	assert.NoError(t, err)
+	assert.Equal(t, "source_snapshot_data", string(srcRestart.Data()))
+}

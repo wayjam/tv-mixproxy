@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/cleaner"
 	"github.com/wayjam/tv-mixproxy/pkg/m3u"
 	"github.com/wayjam/tv-mixproxy/pkg/txt"
 )
@@ -101,7 +102,24 @@ func MixM3UMediaPlayList(
 			result.VariantStreams = append(result.VariantStreams, variant)
 		}
 	}
-	if !cfg.EPGOpt.Disable && result.GetTag("x-tvg-url") == "" {
+	// Process tracks with cleaner, EPG/logo mapping, and default group
+	cleanEngine := cleaner.NewEngine(cfg.CleanerOpt, cfg.EPGMappingOpt)
+	for i := range result.Tracks {
+		cleanEngine.ProcessTrack(&result.Tracks[i])
+		if cfg.M3UOpt.DefaultGroup != "" && result.Tracks[i].GetTag("group-title") == "" {
+			result.Tracks[i].SetTag("group-title", cfg.M3UOpt.DefaultGroup)
+		}
+	}
+
+	// Process EPG URLs injection
+	if len(cfg.M3UOpt.EPGURLs) > 0 {
+		var resolvedEPGs []string
+		for _, u := range cfg.M3UOpt.EPGURLs {
+			u = strings.ReplaceAll(u, "{external_url}", getExternalURL(cfg))
+			resolvedEPGs = append(resolvedEPGs, u)
+		}
+		result.SetTag("x-tvg-url", strings.Join(resolvedEPGs, ","))
+	} else if !cfg.EPGOpt.Disable && result.GetTag("x-tvg-url") == "" {
 		result.SetTag("x-tvg-url", getExternalURL(cfg)+"/v1/epg.xml")
 	}
 

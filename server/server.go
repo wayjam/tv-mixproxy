@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	fiberlog "github.com/gofiber/fiber/v3/log"
@@ -42,12 +43,11 @@ func NewServer(cfg *config.Config) *server {
 	} else {
 		logOutput = &lumberjack.Logger{
 			Filename:   cfg.Log.Output,
-			MaxSize:    100, // megabytes
-			MaxBackups: 3,
-			MaxAge:     28, // days
+			MaxSize:    cfg.Log.MaxSizeMB,
+			MaxBackups: cfg.Log.MaxBackups,
+			MaxAge:     cfg.Log.MaxAgeDays,
 		}
 	}
-
 	// Set up custom logger format
 	fiberlog.SetOutput(logOutput)
 	fiberlog.SetLevel(fiberlog.Level(cfg.Log.Level))
@@ -60,8 +60,13 @@ func NewServer(cfg *config.Config) *server {
 		TimeZone:   "Local",
 	}))
 
-	sourceManager := mixer.NewSourceManager(cfg.Sources, slog.Default())
-	cacheManager := cache.NewManager()
+	sourceManager := mixer.NewSourceManagerWithConfig(cfg, slog.Default())
+	cacheManager := cache.NewManagerWithOptions(cache.Options{
+		Disable:    cfg.CacheOpt.Disable,
+		TTL:        time.Duration(cfg.CacheOpt.TTL) * time.Second,
+		MaxEntries: cfg.CacheOpt.MaxEntries,
+		MaxBytes:   int64(cfg.CacheOpt.MaxMemoryMB) * 1024 * 1024,
+	})
 
 	return &server{
 		app:           app,

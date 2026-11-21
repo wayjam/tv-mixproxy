@@ -11,14 +11,16 @@ TV MixProxy 是一个用于混合不同 电视接口 并提供服务的工具。
 ## 功能特点
 
 - 支持 TVBox 单仓库和 TVBox 多仓库设置，支持在 `lives` 中通过 `source_name: "internal/m3u"` 自动引入内置 M3U 频道
-- 支持代理与混合 XMLTV 标准 EPG，以及 DIYP 轻量级 JSON EPG 接口
-- 支持代理与混合 M3U 媒体播放列表，自动注入 `x-tvg-url`，兼容主流 IPTV 客户端（TiviMate, Kodi, PotPlayer, APtv）
-- 支持 TXT / DIYP 纯文本直播源格式双向互转与统一聚合
-- 全局内存缓存层与 HTTP 协商缓存（ETag / If-None-Match 304 Not Modified），多端并发唤醒秒级响应
+- 支持代理与混合 XMLTV 标准 EPG，以及 DIYP 轻量级 JSON EPG 接口（`/api/diyp`）
+- 支持代理与混合 M3U 媒体播放列表，自动规范化属性与注入多 EPG 地址（`x-tvg-url`），兼容主流 IPTV 客户端（TiviMate, Kodi, PotPlayer, APtv）
+- 支持 TXT / DIYP 纯文本直播源格式双向互转与统一聚合（`/v1/live.txt`）
+- **频道名称智能清洗引擎**：正则剥离 `[IPv6]`、`[1080P]`、`4K`、`高清` 等修饰标签，央视与卫视别名自动规范对齐
+- **高清台标与 EPG 自动绑定**：缺失 `tvg-logo` 和 `tvg-id` 时自动根据规范频道名匹配注入
+- **磁盘持久化快照与故障降级（Stale-While-Revalidate）**：上游超时或不可用时自动降级使用本地磁盘历史快照，杜绝电视黑屏
+- **可配置缓存策略与防 OOM 内存保护**：支持 LRU 淘汰无界动态 DIYP 请求、保护核心 M3U/EPG 条目常驻（Pinned），严格限制内存与条目上限
+- **全局与单源网络定制**：支持自定义超时、失败重试、HTTP/SOCKS5 代理及防盗链请求头
 - 源请求并发合并（Singleflight），防止多客户端同时请求导致上游被封
-- 可自定义不同配置字段的混合与过滤选项（支持正则及多种属性匹配）
-- 定期后台异步自动更新源配置
-## 部署
+- HTTP 协商缓存（ETag / If-None-Match 304 Not Modified）与 API 刷新密钥鉴权
 
 ### 二进制
 

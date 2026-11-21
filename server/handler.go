@@ -96,20 +96,31 @@ func Wallpaper(c fiber.Ctx) error {
 
 func sendCachedOrCompute(
 	c fiber.Ctx,
+	cfg *config.Config,
 	cacheManager *cache.Manager,
 	cacheKey string,
 	version string,
 	contentType string,
+	pinned bool,
 	extraHeaders map[string]string,
 	compute func() ([]byte, error),
 ) error {
-	if cacheManager != nil {
+	maxAge := 60
+	if cfg != nil && cfg.CacheOpt.MaxAge > 0 {
+		maxAge = cfg.CacheOpt.MaxAge
+	}
+	cacheControlVal := fmt.Sprintf("public, max-age=%d", maxAge)
+	if cfg != nil && cfg.CacheOpt.Disable {
+		cacheControlVal = "no-cache, no-store, must-revalidate"
+	}
+
+	if cacheManager != nil && (cfg == nil || !cfg.CacheOpt.Disable) {
 		if entry, ok := cacheManager.Get(cacheKey); ok && entry.Version == version {
 			for k, v := range entry.Header {
 				c.Set(k, v)
 			}
 			c.Set("ETag", entry.ETag)
-			c.Set("Cache-Control", "public, max-age=60")
+			c.Set("Cache-Control", cacheControlVal)
 
 			if match := c.Get("If-None-Match"); match != "" && (match == entry.ETag || match == "*") {
 				return c.SendStatus(fiber.StatusNotModified)
@@ -126,18 +137,22 @@ func sendCachedOrCompute(
 	}
 
 	var etag string
-	if cacheManager != nil {
-		entry := cacheManager.Set(cacheKey, data, contentType, version, extraHeaders)
+	if cacheManager != nil && (cfg == nil || !cfg.CacheOpt.Disable) {
+		var entry cache.Entry
+		if pinned {
+			entry = cacheManager.SetPinned(cacheKey, data, contentType, version, extraHeaders)
+		} else {
+			entry = cacheManager.Set(cacheKey, data, contentType, version, extraHeaders)
+		}
 		etag = entry.ETag
 	}
 
 	for k, v := range extraHeaders {
 		c.Set(k, v)
 	}
+	c.Set("Cache-Control", cacheControlVal)
 	if etag != "" {
 		c.Set("ETag", etag)
-		c.Set("Cache-Control", "public, max-age=60")
-
 		if match := c.Get("If-None-Match"); match != "" && (match == etag || match == "*") {
 			return c.SendStatus(fiber.StatusNotModified)
 		}
@@ -154,7 +169,7 @@ func NewRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cach
 		}
 
 		version := sourceManager.GetFingerprint()
-		return sendCachedOrCompute(c, cacheManager, "tvbox_repo", version, "application/json; charset=utf-8", nil, func() ([]byte, error) {
+		return sendCachedOrCompute(c, cfg, cacheManager, "tvbox_repo", version, "application/json; charset=utf-8", true, nil, func() ([]byte, error) {
 			result, err := mixer.MixTvBoxRepo(cfg, sourceManager)
 			if err != nil {
 				return nil, err
@@ -171,7 +186,7 @@ func NewMultiRepoHandler(cfg *config.Config, sourceManager *mixer.SourceManager,
 		}
 
 		version := sourceManager.GetFingerprint()
-		return sendCachedOrCompute(c, cacheManager, "tvbox_multi_repo", version, "application/json; charset=utf-8", nil, func() ([]byte, error) {
+		return sendCachedOrCompute(c, cfg, cacheManager, "tvbox_multi_repo", version, "application/json; charset=utf-8", true, nil, func() ([]byte, error) {
 			result, err := mixer.MixMultiRepo(cfg, sourceManager)
 			if err != nil {
 				return nil, err
@@ -207,7 +222,7 @@ func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cache
 			headers := map[string]string{
 				"Content-Disposition": "attachment; filename=epg.xml.gz",
 			}
-			return sendCachedOrCompute(c, cacheManager, "epg_xml_gz", version, "application/gzip", headers, func() ([]byte, error) {
+			return sendCachedOrCompute(c, cfg, cacheManager, "epg_xml_gz", version, "application/gzip", true, headers, func() ([]byte, error) {
 				result, err := mixer.MixEPG(cfg, sourceManager)
 				if err != nil {
 					return nil, err
@@ -229,7 +244,7 @@ func NewEPGHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cache
 			})
 		}
 
-		return sendCachedOrCompute(c, cacheManager, "epg_xml", version, "application/xml; charset=utf-8", nil, func() ([]byte, error) {
+		return sendCachedOrCompute(c, cfg, cacheManager, "epg_xml", version, "application/xml; charset=utf-8", true, nil, func() ([]byte, error) {
 			result, err := mixer.MixEPG(cfg, sourceManager)
 			if err != nil {
 				return nil, err
@@ -255,7 +270,7 @@ func NewM3UMediaHandler(cfg *config.Config, sourceManager *mixer.SourceManager, 
 		}
 
 		version := sourceManager.GetFingerprint()
-		return sendCachedOrCompute(c, cacheManager, "m3u_media_playlist", version, "application/vnd.apple.mpegurl; charset=utf-8", nil, func() ([]byte, error) {
+		return sendCachedOrCompute(c, cfg, cacheManager, "m3u_media_playlist", version, "application/vnd.apple.mpegurl; charset=utf-8", true, nil, func() ([]byte, error) {
 			result, err := mixer.MixM3UMediaPlayList(cfg, sourceManager)
 			if err != nil {
 				return nil, err
@@ -269,12 +284,18 @@ func RefershSrouceHandler(cfg *config.Config, sourceManager *mixer.SourceManager
 	return func(c fiber.Ctx) error {
 		cronSecret := os.Getenv("CRON_SECRET")
 		token := os.Getenv("TV_MIXPROXY_SECRET")
+		if cfg != nil && cfg.SecurityOpt.GetSecret() != "" {
+			token = cfg.SecurityOpt.GetSecret()
+		}
 
 		pass := false
+		authHeader := c.Get("Authorization")
+		secretHeader := c.Get("X-TV-MIXPROXY-SECRET")
+		queryToken := c.Query("token", c.Query("secret"))
 
-		if cronSecret != "" && c.Get("Authorization") == "Bearer "+cronSecret {
+		if cronSecret != "" && authHeader == "Bearer "+cronSecret {
 			pass = true
-		} else if token != "" && c.Get("X-TV-MIXPROXY-SECRET") == token {
+		} else if token != "" && (secretHeader == token || authHeader == "Bearer "+token || queryToken == token) {
 			pass = true
 		}
 
@@ -299,7 +320,7 @@ func NewLiveTXTHandler(cfg *config.Config, sourceManager *mixer.SourceManager, c
 		}
 
 		version := sourceManager.GetFingerprint()
-		return sendCachedOrCompute(c, cacheManager, "live_txt", version, "text/plain; charset=utf-8", nil, func() ([]byte, error) {
+		return sendCachedOrCompute(c, cfg, cacheManager, "live_txt", version, "text/plain; charset=utf-8", true, nil, func() ([]byte, error) {
 			result, err := mixer.MixTXT(cfg, sourceManager)
 			if err != nil {
 				return nil, err
@@ -320,7 +341,7 @@ func NewDIYPHandler(cfg *config.Config, sourceManager *mixer.SourceManager, cach
 		version := sourceManager.GetFingerprint()
 		cacheKey := fmt.Sprintf("diyp_%s_%s", ch, date)
 
-		return sendCachedOrCompute(c, cacheManager, cacheKey, version, "application/json; charset=utf-8", nil, func() ([]byte, error) {
+		return sendCachedOrCompute(c, cfg, cacheManager, cacheKey, version, "application/json; charset=utf-8", false, nil, func() ([]byte, error) {
 			result, err := mixer.QueryDIYPEPG(cfg, sourceManager, ch, date)
 			if err != nil {
 				return nil, err

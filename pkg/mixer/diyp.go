@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/wayjam/tv-mixproxy/config"
+	"github.com/wayjam/tv-mixproxy/pkg/cleaner"
 	"github.com/wayjam/tv-mixproxy/pkg/epg"
 )
 
@@ -43,11 +44,25 @@ func QueryDIYPEPG(cfg *config.Config, sourcer Sourcer, channelName, dateStr stri
 		return nil, err
 	}
 
-	matchedChannelIDs := findMatchingChannelIDs(mixedEPG.Channel, channelName)
+	cleanEngine := cleaner.NewEngine(cfg.CleanerOpt, cfg.EPGMappingOpt)
+	cleanedName := cleanEngine.CleanName(channelName)
+
+	var targets []string
+	targets = append(targets, channelName)
+	if cleanedName != channelName {
+		targets = append(targets, cleanedName)
+	}
+	if mappedID, ok := cfg.EPGMappingOpt.Mappings[cleanedName]; ok && mappedID != "" {
+		targets = append(targets, mappedID)
+	}
+	if mappedID, ok := cfg.EPGMappingOpt.Mappings[channelName]; ok && mappedID != "" {
+		targets = append(targets, mappedID)
+	}
+
+	matchedChannelIDs := findMatchingChannelIDs(mixedEPG.Channel, targets...)
 	if len(matchedChannelIDs) == 0 {
 		return resp, nil
 	}
-
 	targetDateCompact := strings.ReplaceAll(dateStr, "-", "")
 
 	for _, prog := range mixedEPG.Programme {
@@ -78,30 +93,35 @@ func normalizeChannelName(s string) string {
 	return s
 }
 
-func findMatchingChannelIDs(channels []epg.Channel, target string) map[string]struct{} {
+func findMatchingChannelIDs(channels []epg.Channel, targets ...string) map[string]struct{} {
 	matched := make(map[string]struct{})
-	targetNorm := normalizeChannelName(target)
 
-	for _, ch := range channels {
-		if strings.EqualFold(ch.ID, target) || normalizeChannelName(ch.ID) == targetNorm {
-			matched[ch.ID] = struct{}{}
-			continue
-		}
-		for _, dn := range ch.DisplayNames {
-			if strings.EqualFold(dn.Text, target) || normalizeChannelName(dn.Text) == targetNorm {
+	for _, target := range targets {
+		targetNorm := normalizeChannelName(target)
+		for _, ch := range channels {
+			if strings.EqualFold(ch.ID, target) || normalizeChannelName(ch.ID) == targetNorm {
 				matched[ch.ID] = struct{}{}
-				break
+				continue
+			}
+			for _, dn := range ch.DisplayNames {
+				if strings.EqualFold(dn.Text, target) || normalizeChannelName(dn.Text) == targetNorm {
+					matched[ch.ID] = struct{}{}
+					break
+				}
 			}
 		}
 	}
 
 	if len(matched) == 0 {
-		for _, ch := range channels {
-			for _, dn := range ch.DisplayNames {
-				dnNorm := normalizeChannelName(dn.Text)
-				if strings.Contains(dnNorm, targetNorm) || strings.Contains(targetNorm, dnNorm) {
-					matched[ch.ID] = struct{}{}
-					break
+		for _, target := range targets {
+			targetNorm := normalizeChannelName(target)
+			for _, ch := range channels {
+				for _, dn := range ch.DisplayNames {
+					dnNorm := normalizeChannelName(dn.Text)
+					if strings.Contains(dnNorm, targetNorm) || strings.Contains(targetNorm, dnNorm) {
+						matched[ch.ID] = struct{}{}
+						break
+					}
 				}
 			}
 		}

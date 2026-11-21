@@ -68,8 +68,20 @@ func TestQueryDIYPEPG(t *testing.T) {
 	assert.Len(t, resp2.EPGData, 1)
 	assert.Equal(t, "次日新闻联播", resp2.EPGData[0].Title)
 
-	// 3. Query non-existent channel
-	resp3, err := QueryDIYPEPG(cfg, mockSourcer, "NonExistent", "2026-11-21")
+	// 3. Query with dirty channel name when cleaner is enabled
+	cfgCleaner := &config.Config{
+		EPGOpt: cfg.EPGOpt,
+		CleanerOpt: config.CleanerOpt{
+			Enable: true,
+		},
+	}
+	respCleaner, err := QueryDIYPEPG(cfgCleaner, mockSourcer, "[IPv6] CCTV1 高清 [1080P]", "2026-11-21")
 	assert.NoError(t, err)
-	assert.Empty(t, resp3.EPGData)
+	assert.Len(t, respCleaner.EPGData, 2)
+	assert.Equal(t, "早间新闻", respCleaner.EPGData[0].Title)
+
+	// 4. Query non-existent channel
+	resp4, err := QueryDIYPEPG(cfg, mockSourcer, "NonExistent", "2026-11-21")
+	assert.NoError(t, err)
+	assert.Empty(t, resp4.EPGData)
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // FlexInt 是一个灵活的整数类型，可以从 JSON 中的数字或字符串解析
@@ -128,14 +129,18 @@ type TvBoxRule struct {
 	Script []string `json:"script,omitempty"`
 }
 
-func LoadTvBoxData(uri string) ([]byte, error) {
-	data, err := FetchData(uri)
+func LoadTvBoxDataWithOptions(uri string, opts FetchOptions) ([]byte, error) {
+	data, err := FetchDataWithOptions(uri, opts)
 	if err != nil {
 		return nil, err
 	}
 
 	data = StripJSONComments(data)
 	return data, nil
+}
+
+func LoadTvBoxData(uri string) ([]byte, error) {
+	return LoadTvBoxDataWithOptions(uri, FetchOptions{Timeout: 30 * time.Second})
 }
 
 func ParseTvBoxMultiRepoConfig(r io.Reader) (*TvBoxMultiRepoConfig, error) {

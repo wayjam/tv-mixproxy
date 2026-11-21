@@ -10,6 +10,12 @@ type Config struct {
 	ServerPort         int                `mapstructure:"server_port"`           // 服务端口, 默认 8080
 	ExternalURL        string             `mapstructure:"external_url"`          // 外部访问地址, eg. http://localhost:8080
 	Log                LogOpt             `mapstructure:"log"`                   // 日志配置
+	CacheOpt           CacheOpt           `mapstructure:"cache"`                 // 统一缓存配置
+	NetworkOpt         NetworkOpt         `mapstructure:"network"`               // 网络与上游抓取配置
+	CleanerOpt         CleanerOpt         `mapstructure:"cleaner"`               // 频道名称清洗规则
+	EPGMappingOpt      EPGMappingOpt      `mapstructure:"epg_mapping"`           // 台标与 EPG 绑定配置
+	PersistenceOpt     PersistenceOpt     `mapstructure:"persistence"`           // 磁盘快照持久化兜底配置
+	SecurityOpt        SecurityOpt        `mapstructure:"security"`              // 安全与鉴权配置
 	Sources            []Source           `mapstructure:"sources"`               // 源配置
 	TvBoxSingleRepoOpt TvBoxSingleRepoOpt `mapstructure:"tvbox_single_repo_opt"` // TvBox单仓源配置
 	TvBoxMultiRepoOpt  TvBoxMultiRepoOpt  `mapstructure:"tvbox_multi_repo_opt"`  // TvBox多仓源配置
@@ -66,6 +72,41 @@ func (c *Config) Fixture() {
 			c.Sources[i].Interval = 60
 		}
 	}
+
+	// Set default Cache options
+	if c.CacheOpt.MaxAge <= 0 {
+		c.CacheOpt.MaxAge = 60
+	}
+	if c.CacheOpt.MaxEntries <= 0 {
+		c.CacheOpt.MaxEntries = 1000
+	}
+	if c.CacheOpt.MaxMemoryMB <= 0 {
+		c.CacheOpt.MaxMemoryMB = 64
+	}
+	if c.CacheOpt.TTL <= 0 {
+		c.CacheOpt.TTL = 3600
+	}
+
+	// Set default Network options
+	if c.NetworkOpt.Timeout <= 0 {
+		c.NetworkOpt.Timeout = 15
+	}
+
+	// Set default Persistence options
+	if c.PersistenceOpt.Dir == "" {
+		c.PersistenceOpt.Dir = "./data/cache"
+	}
+
+	// Set default Log options
+	if c.Log.MaxSizeMB <= 0 {
+		c.Log.MaxSizeMB = 100
+	}
+	if c.Log.MaxBackups <= 0 {
+		c.Log.MaxBackups = 3
+	}
+	if c.Log.MaxAgeDays <= 0 {
+		c.Log.MaxAgeDays = 28
+	}
 }
 
 func (c *Config) fillFallbackSourceName(opt *MixOpt) {
@@ -83,8 +124,11 @@ func (c *Config) fillFallbackSourceNameForArray(opts []ArrayMixOpt) {
 }
 
 type LogOpt struct {
-	Output string `mapstructure:"output"` // 日志输出路径, stdout 表示输出到标准输出
-	Level  int    `mapstructure:"level"`  // 日志级别, 0: Trace, 1: Debug, 2: Info, 3: Warn, 4: Error, 5: Fatal, 6: Panic
+	Output     string `mapstructure:"output"`       // 日志输出路径, stdout 表示输出到标准输出
+	Level      int    `mapstructure:"level"`        // 日志级别, 0: Trace, 1: Debug, 2: Info, 3: Warn, 4: Error, 5: Fatal, 6: Panic
+	MaxSizeMB  int    `mapstructure:"max_size_mb"`  // 单个日志文件最大 MB，默认 100
+	MaxBackups int    `mapstructure:"max_backups"`  // 保留历史日志文件数，默认 3
+	MaxAgeDays int    `mapstructure:"max_age_days"` // 保留天数，默认 28
 }
 
 type TvBoxSingleRepoOpt struct {
@@ -129,6 +173,8 @@ type M3UOpt struct {
 	Disable               bool          `mapstructure:"disable"`                 // 是否禁用M3U源
 	MediaPlaylistFallback MixOpt        `mapstructure:"media_playlist_fallback"` // 媒体播放列表降级配置
 	MediaPlaylistFilters  []ArrayMixOpt `mapstructure:"media_playlist_filters"`  // 媒体播放列表过滤配置
+	EPGURLs               []string      `mapstructure:"epg_urls"`                // 自定义注入的 EPG URL 列表（支持多个）
+	DefaultGroup          string        `mapstructure:"default_group"`           // 默认分组名称，未分组频道自动填充
 	// MasterPlaylistFilters []ArrayMixOpt `mapstructure:"master_playlist_filters"` // 主播放列表过滤配置
 }
 
@@ -146,10 +192,63 @@ type ArrayMixOpt struct {
 }
 
 type Source struct {
-	Name     string     `mapstructure:"name"`     // 源名称, 唯一标识， 用来标识用在配置中
-	URL      string     `mapstructure:"url"`      // 源地址
-	Type     SourceType `mapstructure:"type"`     // 源类型
-	Interval int        `mapstructure:"interval"` // 源更新频率，单位为秒, 默认 60 秒
+	Name     string            `mapstructure:"name"`     // 源名称, 唯一标识， 用来标识用在配置中
+	URL      string            `mapstructure:"url"`      // 源地址
+	Type     SourceType        `mapstructure:"type"`     // 源类型
+	Interval int               `mapstructure:"interval"` // 源更新频率，单位为秒, 默认 60 秒
+	Timeout  int               `mapstructure:"timeout"`  // 单源覆盖超时时间，秒
+	Headers  map[string]string `mapstructure:"headers"`  // 单源覆盖请求头
+	ProxyURL string            `mapstructure:"proxy_url"` // 单源覆盖代理
+}
+
+type CacheOpt struct {
+	Disable     bool `mapstructure:"disable"`       // 是否全局禁用缓存
+	MaxAge      int  `mapstructure:"max_age"`       // 客户端 Cache-Control max-age，秒，默认 60
+	TTL         int  `mapstructure:"ttl"`           // 内存缓存存活时间，秒，默认 3600
+	MaxEntries  int  `mapstructure:"max_entries"`   // 最大条目数，默认 1000
+	MaxMemoryMB int  `mapstructure:"max_memory_mb"` // 最大内存，MB，默认 64
+}
+
+type NetworkOpt struct {
+	Timeout  int               `mapstructure:"timeout"`   // 超时时间，秒，默认 15
+	Retry    int               `mapstructure:"retry"`     // 失败重试次数，默认 0
+	ProxyURL string            `mapstructure:"proxy_url"` // http/https/socks5 代理地址
+	Headers  map[string]string `mapstructure:"headers"`   // 全局默认请求头
+}
+
+type CleanerOpt struct {
+	Enable        bool        `mapstructure:"enable"`         // 是否开启频道名称清洗
+	StripPatterns []string    `mapstructure:"strip_patterns"` // 正则移除多余标签，如 \[IPv[46]\]
+	Aliases       []AliasRule `mapstructure:"aliases"`        // 别名对齐规则
+}
+
+type AliasRule struct {
+	Canonical string   `mapstructure:"canonical"` // 标准名称，如 CCTV-1
+	Matches   []string `mapstructure:"matches"`   // 匹配名称列表，如 ["CCTV1", "CCTV1综合", "CCTV-1 综合"]
+}
+
+type EPGMappingOpt struct {
+	Enable          bool              `mapstructure:"enable"`            // 是否开启台标与 EPG 绑定
+	LogoURLTemplate string            `mapstructure:"logo_url_template"` // e.g. "https://live.fanmingming.com/tv/{name}.png"
+	Mappings        map[string]string `mapstructure:"mappings"`          // 频道名 -> tvg-id 映射
+}
+
+type PersistenceOpt struct {
+	Enable       bool   `mapstructure:"enable"`         // 是否开启磁盘快照兜底
+	Dir          string `mapstructure:"dir"`            // 缓存目录路径，默认 "./data/cache"
+	StaleOnError bool   `mapstructure:"stale_on_error"` // 上游故障时降级使用本地快照，默认 true
+}
+
+type SecurityOpt struct {
+	Secret    string `mapstructure:"secret"`     // API 刷新密钥，替代/补充环境变量 TV_MIXPROXY_SECRET
+	APISecret string `mapstructure:"api_secret"` // 别名支持
+}
+
+func (s SecurityOpt) GetSecret() string {
+	if s.Secret != "" {
+		return s.Secret
+	}
+	return s.APISecret
 }
 
 type SourceType string
@@ -210,6 +309,18 @@ func DefaultConfig() *Config {
 		Log: LogOpt{
 			Output: "stdout",
 			Level:  1,
+		},
+		CacheOpt: CacheOpt{
+			MaxAge:      60,
+			TTL:         3600,
+			MaxEntries:  1000,
+			MaxMemoryMB: 64,
+		},
+		NetworkOpt: NetworkOpt{
+			Timeout: 15,
+		},
+		PersistenceOpt: PersistenceOpt{
+			Dir: "./data/cache",
 		},
 		TvBoxSingleRepoOpt: TvBoxSingleRepoOpt{
 			Disable: true,
