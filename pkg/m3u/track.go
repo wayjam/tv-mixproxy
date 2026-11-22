@@ -77,9 +77,7 @@ func (track *Track) MarshalM3U() ([]byte, error) {
 
 func parseTrack(line string) (*Track, error) {
 	line = strings.TrimSpace(line)
-	if strings.HasPrefix(line, "#EXTINF:") {
-		line = line[8:]
-	}
+	line = strings.TrimPrefix(line, "#EXTINF:")
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return nil, errors.New("empty track line")
